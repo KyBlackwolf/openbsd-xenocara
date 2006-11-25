@@ -11,7 +11,7 @@ typedef struct {
 } VERTEX_SHADER_INSTRUCTION;
 
 extern void r200InitShaderFuncs(struct dd_function_table *functions);
-extern void r200SetupVertexProg( struct gl_context *ctx );
+extern void r200SetupVertexProg( GLcontext *ctx );
 
 #define VSF_FLAG_X	1
 #define VSF_FLAG_Y	2
@@ -89,8 +89,6 @@ extern void r200SetupVertexProg( struct gl_context *ctx );
 
 #define R200_VPI_OUT_OP_EXP                     (65 << 0)
 #define R200_VPI_OUT_OP_LOG                     (66 << 0)
-/* base e exp. Useful for fog. */
-#define R200_VPI_OUT_OP_EXP_E                   (67 << 0)
 
 #define R200_VPI_OUT_OP_LIT                     (68 << 0)
 #define R200_VPI_OUT_OP_POW                     (69 << 0)

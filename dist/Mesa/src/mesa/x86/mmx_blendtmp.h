@@ -4,7 +4,7 @@
 
 
 /*
- * void _mesa_mmx_blend( struct gl_context *ctx,
+ * void _mesa_mmx_blend( GLcontext *ctx,
  *                       GLuint n, 
  *                       const GLubyte mask[],
  *                       GLchan rgba[][4], 

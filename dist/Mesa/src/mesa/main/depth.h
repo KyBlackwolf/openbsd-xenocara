@@ -5,6 +5,7 @@
 
 /*
  * Mesa 3-D graphics library
+ * Version:  6.3
  *
  * Copyright (C) 1999-2005  Brian Paul   All Rights Reserved.
  *
@@ -21,10 +22,9 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
- * OTHER DEALINGS IN THE SOFTWARE.
+ * BRIAN PAUL BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN
+ * AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 
@@ -32,16 +32,13 @@
 #define DEPTH_H
 
 
-#include "glheader.h"
+#include "mtypes.h"
 
-struct gl_context;
 
+#if _HAVE_FULL_GL
 
 extern void GLAPIENTRY
 _mesa_ClearDepth( GLclampd depth );
-
-extern void GLAPIENTRY
-_mesa_ClearDepthf( GLclampf depth );
 
 extern void GLAPIENTRY
 _mesa_DepthFunc( GLenum func );
@@ -53,6 +50,13 @@ extern void GLAPIENTRY
 _mesa_DepthBoundsEXT( GLclampd zmin, GLclampd zmax );
 
 extern void 
-_mesa_init_depth( struct gl_context * ctx );
+_mesa_init_depth( GLcontext * ctx );
+
+#else
+
+/** No-op */
+#define _mesa_init_depth( c ) ((void)0)
+
+#endif
 
 #endif

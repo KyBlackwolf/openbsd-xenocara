@@ -31,10 +31,10 @@
 ** published by SGI, but has not been independently verified as being
 ** compliant with the OpenGL(R) version 1.2.1 Specification.
 **
-** $Date: 2006/11/25 18:54:55 $ $Revision: 1.1 $
+** $Date: 2008/11/02 14:58:11 $ $Revision: 1.2 $
 */
 /*
-** $Header: /home/misha/work/cvs/xenocara/dist/Mesa/src/glu/sgi/libnurbs/internals/Attic/monoTriangulationBackend.cc,v 1.1 2006/11/25 18:54:55 matthieu Exp $
+** $Header: /home/misha/work/cvs/xenocara/dist/Mesa/src/glu/sgi/libnurbs/internals/Attic/monoTriangulationBackend.cc,v 1.2 2008/11/02 14:58:11 matthieu Exp $
 */
 
 #include "monoTriangulation.h"

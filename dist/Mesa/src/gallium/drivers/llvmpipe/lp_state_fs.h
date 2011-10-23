@@ -47,18 +47,6 @@ struct lp_fragment_shader;
 #define RAST_EDGE_TEST 1
 
 
-struct lp_sampler_static_state
-{
-   /*
-    * These attributes are effectively interleaved for more sane key handling.
-    * However, there might be lots of null space if the amount of samplers and
-    * textures isn't the same.
-    */
-   struct lp_static_sampler_state sampler_state;
-   struct lp_static_texture_state texture_state;
-};
-
-
 struct lp_fragment_shader_variant_key
 {
    struct pipe_depth_state depth;
@@ -71,17 +59,14 @@ struct lp_fragment_shader_variant_key
    } alpha;
 
    unsigned nr_cbufs:8;
-   unsigned nr_samplers:8;      /* actually derivable from just the shader */
-   unsigned nr_sampler_views:8; /* actually derivable from just the shader */
+   unsigned nr_samplers:8;	/* actually derivable from just the shader */
    unsigned flatshade:1;
    unsigned occlusion_count:1;
-   unsigned resource_1d:1;
-   unsigned depth_clamp:1;
 
    enum pipe_format zsbuf_format;
    enum pipe_format cbuf_format[PIPE_MAX_COLOR_BUFS];
 
-   struct lp_sampler_static_state state[PIPE_MAX_SHADER_SAMPLER_VIEWS];
+   struct lp_sampler_static_state sampler[PIPE_MAX_SAMPLERS];
 };
 
 
@@ -98,20 +83,10 @@ struct lp_fragment_shader_variant
    struct lp_fragment_shader_variant_key key;
 
    boolean opaque;
-   uint8_t ps_inv_multiplier;
-
-   struct gallivm_state *gallivm;
-
-   LLVMTypeRef jit_context_ptr_type;
-   LLVMTypeRef jit_thread_data_ptr_type;
-   LLVMTypeRef jit_linear_context_ptr_type;
 
    LLVMValueRef function[2];
 
    lp_jit_frag_func jit_function[2];
-
-   /* Total number of LLVM instructions generated */
-   unsigned nr_instrs;
 
    struct lp_fs_variant_list_item list_item_global, list_item_local;
    struct lp_fragment_shader *shader;
@@ -149,9 +124,6 @@ lp_debug_fs_variant(const struct lp_fragment_shader_variant *variant);
 void
 llvmpipe_remove_shader_variant(struct llvmpipe_context *lp,
                                struct lp_fragment_shader_variant *variant);
-
-boolean
-llvmpipe_rasterization_disabled(struct llvmpipe_context *lp);
 
 
 #endif /* LP_STATE_FS_H_ */

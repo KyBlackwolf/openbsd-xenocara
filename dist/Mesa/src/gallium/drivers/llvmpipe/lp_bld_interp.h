@@ -55,7 +55,7 @@
  * src_index.
  *
  * LP_INTERP_COLOR is translated to either LP_INTERP_CONSTANT or
- * PERSPECTIVE depending on flatshade state.
+ * LINEAR depending on flatshade state.
  */
 enum lp_interp {
    LP_INTERP_CONSTANT,
@@ -67,46 +67,36 @@ enum lp_interp {
 };
 
 struct lp_shader_input {
-   uint interp:4;       /* enum lp_interp */
-   uint usage_mask:4;   /* bitmask of TGSI_WRITEMASK_x flags */
-   uint src_index:8;    /* where to find values in incoming vertices */
-   uint cyl_wrap:4;     /* TGSI_CYLINDRICAL_WRAP_x flags */
-   uint padding:12;
+   ushort interp:4;       /* enum lp_interp */
+   ushort usage_mask:4;   /* bitmask of TGSI_WRITEMASK_x flags */
+   ushort src_index:8;    /* where to find values in incoming vertices */
 };
 
 
 struct lp_build_interp_soa_context
 {
-   /* TGSI_QUAD_SIZE x float */
+   /* QUAD_SIZE x float */
    struct lp_build_context coeff_bld;
-   struct lp_build_context setup_bld;
 
    unsigned num_attribs;
    unsigned mask[1 + PIPE_MAX_SHADER_INPUTS]; /**< TGSI_WRITE_MASK_x */
    enum lp_interp interp[1 + PIPE_MAX_SHADER_INPUTS];
-   boolean simple_interp;
-
-   double pos_offset;
 
    LLVMValueRef x;
    LLVMValueRef y;
 
-   LLVMValueRef a[1 + PIPE_MAX_SHADER_INPUTS][TGSI_NUM_CHANNELS];
-   LLVMValueRef dadq[1 + PIPE_MAX_SHADER_INPUTS][TGSI_NUM_CHANNELS];
-   LLVMValueRef a0aos[1 + PIPE_MAX_SHADER_INPUTS];
-   LLVMValueRef dadxaos[1 + PIPE_MAX_SHADER_INPUTS];
-   LLVMValueRef dadyaos[1 + PIPE_MAX_SHADER_INPUTS];
+   LLVMValueRef a   [1 + PIPE_MAX_SHADER_INPUTS][NUM_CHANNELS];
+   LLVMValueRef dadq[1 + PIPE_MAX_SHADER_INPUTS][NUM_CHANNELS];
 
-   LLVMValueRef attribs[1 + PIPE_MAX_SHADER_INPUTS][TGSI_NUM_CHANNELS];
+   LLVMValueRef oow;
 
-   LLVMValueRef xoffset_store;
-   LLVMValueRef yoffset_store;
+   LLVMValueRef attribs[1 + PIPE_MAX_SHADER_INPUTS][NUM_CHANNELS];
 
    /*
     * Convenience pointers. Callers may access this one.
     */
    const LLVMValueRef *pos;
-   const LLVMValueRef (*inputs)[TGSI_NUM_CHANNELS];
+   const LLVMValueRef (*inputs)[NUM_CHANNELS];
 };
 
 
@@ -115,7 +105,6 @@ lp_build_interp_soa_init(struct lp_build_interp_soa_context *bld,
                          struct gallivm_state *gallivm,
                          unsigned num_inputs,
                          const struct lp_shader_input *inputs,
-                         boolean pixel_center_integer,
                          LLVMBuilderRef builder,
                          struct lp_type type,
                          LLVMValueRef a0_ptr,
@@ -125,13 +114,14 @@ lp_build_interp_soa_init(struct lp_build_interp_soa_context *bld,
                          LLVMValueRef y);
 
 void
-lp_build_interp_soa_update_inputs_dyn(struct lp_build_interp_soa_context *bld,
-                                      struct gallivm_state *gallivm,
-                                      LLVMValueRef quad_start_index);
+lp_build_interp_soa_update_inputs(struct lp_build_interp_soa_context *bld,
+                                  struct gallivm_state *gallivm,
+                                  int quad_index);
 
 void
-lp_build_interp_soa_update_pos_dyn(struct lp_build_interp_soa_context *bld,
-                                   struct gallivm_state *gallivm,
-                                   LLVMValueRef quad_start_index);
+lp_build_interp_soa_update_pos(struct lp_build_interp_soa_context *bld,
+                               struct gallivm_state *gallivm,
+                               int quad_index);
+
 
 #endif /* LP_BLD_INTERP_H */

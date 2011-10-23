@@ -32,9 +32,8 @@
 #include "ir.h"
 #include "ir_visitor.h"
 #include "ir_rvalue_visitor.h"
+#include "ir_print_visitor.h"
 #include "glsl_types.h"
-
-namespace {
 
 class ir_noop_swizzle_visitor : public ir_rvalue_visitor {
 public:
@@ -46,8 +45,6 @@ public:
    void handle_rvalue(ir_rvalue **rvalue);
    bool progress;
 };
-
-} /* unnamed namespace */
 
 void
 ir_noop_swizzle_visitor::handle_rvalue(ir_rvalue **rvalue)

@@ -1,6 +1,6 @@
 /**************************************************************************
  *
- * Copyright 2008 VMware, Inc.
+ * Copyright 2008 Tungsten Graphics, Inc., Cedar Park, Texas.
  * All Rights Reserved.
  *
  **************************************************************************/
@@ -14,9 +14,8 @@
 
 #include <stdlib.h>
 #include <math.h>
-#include "glheader.h"
-#include "querymatrix.h"
-#include "main/get.h"
+#include "GLES/gl.h"
+#include "GLES/glext.h"
 
 
 /**
@@ -38,7 +37,6 @@
 #define FLOAT_TO_FIXED(x) ((GLfixed) ((x) * 65536.0))
 
 #if defined(_MSC_VER)
-#if _MSC_VER < 1800  /* Not required on VS2013 and above. */
 /* Oddly, the fpclassify() function doesn't exist in such a form
  * on MSVC.  This is an implementation using slightly different
  * lower-level Windows functions.
@@ -71,12 +69,11 @@ fpclassify(double x)
             return FP_NAN;
     }
 }
-#endif  /* _MSC_VER < 1800 */
 
 #elif defined(__APPLE__) || defined(__CYGWIN__) || defined(__FreeBSD__) || \
      defined(__OpenBSD__) || defined(__NetBSD__) || defined(__DragonFly__) || \
      (defined(__sun) && defined(__C99FEATURES__)) || defined(__MINGW32__) || \
-     (defined(__sun) && defined(__GNUC__)) || defined(ANDROID) || defined(__HAIKU__)
+     (defined(__sun) && defined(__GNUC__))
 
 /* fpclassify is available. */
 
@@ -91,7 +88,13 @@ fpclassify(double x)
 
 #endif
 
-GLbitfield GLAPIENTRY _mesa_QueryMatrixxOES(GLfixed mantissa[16], GLint exponent[16])
+extern GLbitfield GL_APIENTRY _es_QueryMatrixxOES(GLfixed mantissa[16], GLint exponent[16]);
+
+/* The Mesa functions we'll need */
+extern void GL_APIENTRY _mesa_GetIntegerv(GLenum pname, GLint *params);
+extern void GL_APIENTRY _mesa_GetFloatv(GLenum pname, GLfloat *params);
+
+GLbitfield GL_APIENTRY _es_QueryMatrixxOES(GLfixed mantissa[16], GLint exponent[16])
 {
     GLfloat matrix[16];
     GLint tmp;

@@ -37,8 +37,6 @@
 
 #include "ir.h"
 
-namespace {
-
 class lower_texture_projection_visitor : public ir_hierarchical_visitor {
 public:
    lower_texture_projection_visitor()
@@ -50,8 +48,6 @@ public:
 
    bool progress;
 };
-
-} /* anonymous namespace */
 
 ir_visitor_status
 lower_texture_projection_visitor::visit_leave(ir_texture *ir)

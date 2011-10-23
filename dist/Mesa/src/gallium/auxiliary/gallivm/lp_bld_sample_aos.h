@@ -42,15 +42,14 @@
 
 void
 lp_build_sample_aos(struct lp_build_sample_context *bld,
-                    unsigned sampler_unit,
+                    unsigned unit,
                     LLVMValueRef s,
                     LLVMValueRef t,
                     LLVMValueRef r,
-                    const LLVMValueRef *offsets,
-                    LLVMValueRef lod_positive,
-                    LLVMValueRef lod_fpart,
-                    LLVMValueRef ilevel0,
-                    LLVMValueRef ilevel1,
+                    const LLVMValueRef *ddx,
+                    const LLVMValueRef *ddy,
+                    LLVMValueRef lod_bias, /* optional */
+                    LLVMValueRef explicit_lod, /* optional */
                     LLVMValueRef texel_out[4]);
 
 

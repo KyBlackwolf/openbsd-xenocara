@@ -32,7 +32,7 @@
 boolean
 util_surfaces_do_get(struct util_surfaces *us, unsigned surface_struct_size,
                      struct pipe_context *ctx, struct pipe_resource *pt,
-                     unsigned level, unsigned layer,
+                     unsigned level, unsigned layer, unsigned flags,
                      struct pipe_surface **res)
 {
    struct pipe_surface *ps;
@@ -65,7 +65,7 @@ util_surfaces_do_get(struct util_surfaces *us, unsigned surface_struct_size,
       return FALSE;
    }
 
-   pipe_surface_init(ctx, ps, pt, level, layer);
+   pipe_surface_init(ctx, ps, pt, level, layer, flags);
 
    if(pt->target == PIPE_TEXTURE_3D || pt->target == PIPE_TEXTURE_CUBE)
       cso_hash_insert(us->u.hash, (layer << 8) | level, ps);

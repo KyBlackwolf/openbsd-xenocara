@@ -1,5 +1,6 @@
 /*
  * Mesa 3-D graphics library
+ * Version:  7.9
  *
  * Copyright (C) 2010 LunarG Inc.
  *
@@ -31,7 +32,8 @@
  * The public header of core mesa.
  *
  * This file is the (only) public header of core mesa.  It is supposed to be
- * used by GLX, WGL, and GLSL.
+ * used by GLX, WGL, and GLSL.  It is important that headers directly or
+ * indirectly included here do not perform feature tests (#if FEATURE_xxx).
  */
 
 
@@ -46,8 +48,17 @@
 
 #include "main/mtypes.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* for GLSL */
 #include "program/prog_parameter.h"
+#include "program/prog_uniform.h"
+
+#ifdef __cplusplus
+}
+#endif
 
 
 #endif /* CORE_H */

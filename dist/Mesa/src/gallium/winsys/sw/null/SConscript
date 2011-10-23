@@ -18,5 +18,4 @@ ws_null = env.ConvenienceLibrary(
        'null_sw_winsys.c',
     ]
 )
-env.Alias('ws_null', ws_null)
 Export('ws_null')

@@ -15,9 +15,8 @@
  *
  * How to use this source:
  *
- * - Download and build the NTL library from
- *   http://shoup.net/ntl/download.html , or install libntl-dev package if on
- *   Debian.
+ * - Download and abuild the NTL library from
+ *   http://shoup.net/ntl/download.html
  *
  * - Download boost source code matching to your distro. 
  *
@@ -25,7 +24,7 @@
  *
  * - Build as
  *
- *   g++ -o minimax -I /path/to/ntl/include main.cpp f.cpp /path/to/ntl/src/ntl.a
+ *   g++ -o minimax -I /path/to/ntl/include main.cpp f.cpp /path/to/ntl/src/ntl.a -lboost_math_tr1
  *
  * - Run as 
  *
@@ -33,24 +32,14 @@
  *
  * - For example, to compute exp2 5th order polynomial between [0, 1] do:
  *
- *    variant 0
+ *    variant 1
  *    range 0 1
  *    order 5 0
- *    step 200
- *    info
- *
- *  and take the coefficients from the P = { ... } array.
- *
- * - To compute log2 4th order polynomial between [0, 1/9] do:
- *
- *    variant 1
- *    range 0 0.111111112
- *    order 4 0
- *    step 200
+ *    steps 200
  *    info
  *
  * - For more info see
- * http://www.boost.org/doc/libs/1_47_0/libs/math/doc/sf_and_dist/html/math_toolkit/toolkit/internals2/minimax.html
+ * http://www.boost.org/doc/libs/1_36_0/libs/math/doc/sf_and_dist/html/math_toolkit/toolkit/internals2/minimax.html
  */
 
 #define L22
@@ -59,25 +48,20 @@
 
 #include <cmath>
 
-boost::math::ntl::RR exp2(const boost::math::ntl::RR& x)
-{
-      return exp(x*log(2.0));
-}
-
-boost::math::ntl::RR log2(const boost::math::ntl::RR& x)
-{
-      return log(x)/log(2.0);
-}
 
 boost::math::ntl::RR f(const boost::math::ntl::RR& x, int variant)
 {
+   static const boost::math::ntl::RR tiny = boost::math::tools::min_value<boost::math::ntl::RR>() * 64;
+   
    switch(variant)
    {
    case 0:
-      return exp2(x);
+      // log2(x)/(x - 1)
+      return log(x)/log(2.0)/(x - 1.0);
 
    case 1:
-      return log2((1.0 + sqrt(x))/(1.0 - sqrt(x)))/sqrt(x);
+      // exp2(x)
+      return exp(x*log(2.0));
    }
 
    return 0;

@@ -1,7 +1,8 @@
 /*
  * Mesa 3-D graphics library
+ * Version:  7.9
  *
- * Copyright 2008 VMware, Inc.
+ * Copyright 2008 Tungsten Graphics, Inc., Cedar Park, Texas.
  * Copyright (C) 2010 LunarG Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -23,7 +24,7 @@
  * DEALINGS IN THE SOFTWARE.
  *
  * Authors:
-  *   Keith Whitwell <keithw@vmware.com>
+  *   Keith Whitwell <keith@tungstengraphics.com>
  *    Chia-I Wu <olv@lunarg.com>
  */
 
@@ -192,18 +193,13 @@ FUNC(FUNC_VARS)
             flags = DRAW_PIPE_RESET_STIPPLE |
                     DRAW_PIPE_EDGE_FLAG_0 |
                     DRAW_PIPE_EDGE_FLAG_1;
-            /* always emit idx[3] / idx[0] first */
-            if (quads_flatshade_last)
-               TRIANGLE(flags, idx[3], idx[0], idx[1]);
-            else
-               TRIANGLE(flags, idx[0], idx[1], idx[2]);
+            /* XXX should always emit idx[0] first */
+            /* always emit idx[3] first */
+            TRIANGLE(flags, idx[3], idx[0], idx[1]);
 
             flags = DRAW_PIPE_EDGE_FLAG_1 |
                     DRAW_PIPE_EDGE_FLAG_2;
-            if (quads_flatshade_last)
-               TRIANGLE(flags, idx[3], idx[1], idx[2]);
-            else
-               TRIANGLE(flags, idx[0], idx[2], idx[3]);
+            TRIANGLE(flags, idx[3], idx[1], idx[2]);
          }
       }
       break;
@@ -241,18 +237,13 @@ FUNC(FUNC_VARS)
                flags = DRAW_PIPE_RESET_STIPPLE |
                        DRAW_PIPE_EDGE_FLAG_0 |
                        DRAW_PIPE_EDGE_FLAG_1;
-               /* always emit idx[3] / idx[0 first */
-               if (quads_flatshade_last)
-                  TRIANGLE(flags, idx[3], idx[2], idx[0]);
-               else
-                  TRIANGLE(flags, idx[0], idx[3], idx[2]);
+               /* XXX should always emit idx[0] first */
+               /* always emit idx[3] first */
+               TRIANGLE(flags, idx[3], idx[2], idx[0]);
 
                flags = DRAW_PIPE_EDGE_FLAG_1 |
                        DRAW_PIPE_EDGE_FLAG_2;
-               if (quads_flatshade_last)
-                  TRIANGLE(flags, idx[3], idx[0], idx[1]);
-               else
-                  TRIANGLE(flags, idx[0], idx[1], idx[3]);
+               TRIANGLE(flags, idx[3], idx[0], idx[1]);
             }
          }
       }

@@ -33,7 +33,7 @@
 #include "lp_bld_init.h"
 
 
-void
+LLVMValueRef
 lp_build_assert(struct gallivm_state *gallivm,
                 LLVMValueRef condition,
                 const char *msg);

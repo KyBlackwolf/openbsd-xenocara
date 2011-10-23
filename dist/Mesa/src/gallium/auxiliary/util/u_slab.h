@@ -28,7 +28,7 @@
  * Good for allocations which have very low lifetime and are allocated
  * and freed very often. Use a profiler first to know if it's worth using it!
  *
- * Candidates: transfer_map
+ * Candidates: get_transfer, user_buffer_create
  *
  * @author Marek Olšák
  */

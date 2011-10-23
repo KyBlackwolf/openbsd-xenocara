@@ -55,7 +55,7 @@ static void util_slab_add_new_page(struct util_slab_mempool *pool)
 {
    struct util_slab_page *page;
    struct util_slab_block *block;
-   unsigned i;
+   int i;
 
    page = MALLOC(pool->page_size);
    insert_at_tail(&pool->list, page);
@@ -160,11 +160,9 @@ void util_slab_destroy(struct util_slab_mempool *pool)
 {
    struct util_slab_page *page, *temp;
 
-   if (pool->list.next) {
-      foreach_s(page, temp, &pool->list) {
-         remove_from_list(page);
-         FREE(page);
-      }
+   foreach_s(page, temp, &pool->list) {
+      remove_from_list(page);
+      FREE(page);
    }
 
    pipe_mutex_destroy(pool->mutex);

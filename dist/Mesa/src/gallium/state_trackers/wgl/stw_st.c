@@ -1,5 +1,6 @@
 /*
  * Mesa 3-D graphics library
+ * Version:  7.9
  *
  * Copyright (C) 2010 LunarG Inc.
  *
@@ -16,10 +17,9 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
- * OTHER DEALINGS IN THE SOFTWARE.
+ * BRIAN PAUL BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN
+ * AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  * Authors:
  *    Chia-I Wu <olv@lunarg.com>
@@ -27,7 +27,6 @@
 
 #include "util/u_memory.h"
 #include "util/u_inlines.h"
-#include "util/u_atomic.h"
 #include "state_tracker/st_gl_api.h" /* for st_gl_api_create */
 
 #include "stw_st.h"
@@ -121,8 +120,7 @@ stw_st_framebuffer_validate_locked(struct st_framebuffer_iface *stfb,
 }
 
 static boolean 
-stw_st_framebuffer_validate(struct st_context_iface *stctx,
-                            struct st_framebuffer_iface *stfb,
+stw_st_framebuffer_validate(struct st_framebuffer_iface *stfb,
                             const enum st_attachment_type *statts,
                             unsigned count,
                             struct pipe_resource **out)
@@ -172,26 +170,14 @@ stw_st_framebuffer_present_locked(HDC hdc,
 }
 
 static boolean
-stw_st_framebuffer_flush_front(struct st_context_iface *stctx,
-                               struct st_framebuffer_iface *stfb,
+stw_st_framebuffer_flush_front(struct st_framebuffer_iface *stfb,
                                enum st_attachment_type statt)
 {
    struct stw_st_framebuffer *stwfb = stw_st_framebuffer(stfb);
-   boolean ret;
-   HDC hDC;
 
    pipe_mutex_lock(stwfb->fb->mutex);
 
-   /* We must not cache HDCs anywhere, as they can be invalidated by the
-    * application, or screen resolution changes. */
-
-   hDC = GetDC(stwfb->fb->hWnd);
-
-   ret = stw_st_framebuffer_present_locked(hDC, &stwfb->base, statt);
-
-   ReleaseDC(stwfb->fb->hWnd, hDC);
-
-   return ret;
+   return stw_st_framebuffer_present_locked(stwfb->fb->hDC, &stwfb->base, statt);
 }
 
 /**
@@ -210,7 +196,6 @@ stw_st_create_framebuffer(struct stw_framebuffer *fb)
    stwfb->stvis = fb->pfi->stvis;
 
    stwfb->base.visual = &stwfb->stvis;
-   p_atomic_set(&stwfb->base.stamp, 1);
    stwfb->base.flush_front = stw_st_framebuffer_flush_front;
    stwfb->base.validate = stw_st_framebuffer_validate;
 
@@ -263,19 +248,6 @@ stw_st_swap_framebuffer_locked(HDC hdc, struct st_framebuffer_iface *stfb)
    front = ST_ATTACHMENT_FRONT_LEFT;
    return stw_st_framebuffer_present_locked(hdc, &stwfb->base, front);
 }
-
-
-/**
- * Return the pipe_resource that correspond to given buffer.
- */
-struct pipe_resource *
-stw_get_framebuffer_resource(struct st_framebuffer_iface *stfb,
-                             enum st_attachment_type att)
-{
-   struct stw_st_framebuffer *stwfb = stw_st_framebuffer(stfb);
-   return stwfb->textures[att];
-}
-
 
 /**
  * Create an st_api of the state tracker.

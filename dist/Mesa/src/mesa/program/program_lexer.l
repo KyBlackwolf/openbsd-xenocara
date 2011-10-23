@@ -165,7 +165,6 @@ szf    [HR]?
 cc     C?
 sat    (_SAT)?
 
-%option prefix="_mesa_program_lexer_"
 %option bison-bridge bison-locations reentrant noyywrap
 %%
 

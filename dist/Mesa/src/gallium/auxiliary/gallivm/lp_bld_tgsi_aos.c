@@ -55,8 +55,53 @@
 #include "lp_bld_flow.h"
 #include "lp_bld_quad.h"
 #include "lp_bld_tgsi.h"
+#include "lp_bld_limits.h"
 #include "lp_bld_debug.h"
-#include "lp_bld_sample.h"
+
+
+#define LP_MAX_INSTRUCTIONS 256
+
+
+struct lp_build_tgsi_aos_context
+{
+   struct lp_build_context base;
+
+   /* Builder for integer masks and indices */
+   struct lp_build_context int_bld;
+
+   /*
+    * AoS swizzle used:
+    * - swizzles[0] = red index
+    * - swizzles[1] = green index
+    * - swizzles[2] = blue index
+    * - swizzles[3] = alpha index
+    */
+   unsigned char swizzles[4];
+   unsigned char inv_swizzles[4];
+
+   LLVMValueRef consts_ptr;
+   const LLVMValueRef *inputs;
+   LLVMValueRef *outputs;
+
+   struct lp_build_sampler_aos *sampler;
+
+   LLVMValueRef immediates[LP_MAX_TGSI_IMMEDIATES];
+   LLVMValueRef temps[LP_MAX_TGSI_TEMPS];
+   LLVMValueRef addr[LP_MAX_TGSI_ADDRS];
+   LLVMValueRef preds[LP_MAX_TGSI_PREDS];
+
+   /* We allocate/use this array of temps if (1 << TGSI_FILE_TEMPORARY) is
+    * set in the indirect_files field.
+    * The temps[] array above is unused then.
+    */
+   LLVMValueRef temps_array;
+
+   /** bitmask indicating which register files are accessed indirectly */
+   unsigned indirect_files;
+
+   struct tgsi_full_instruction *instructions;
+   uint max_instructions;
+};
 
 
 /**
@@ -64,7 +109,7 @@
  * ordering.
  */
 static LLVMValueRef
-swizzle_aos(struct lp_build_tgsi_context *bld_base,
+swizzle_aos(struct lp_build_tgsi_aos_context *bld,
             LLVMValueRef a,
             unsigned swizzle_x,
             unsigned swizzle_y,
@@ -72,7 +117,6 @@ swizzle_aos(struct lp_build_tgsi_context *bld_base,
             unsigned swizzle_w)
 {
    unsigned char swizzles[4];
-   struct lp_build_tgsi_aos_context *bld = lp_aos_context(bld_base);
 
    assert(swizzle_x < 4);
    assert(swizzle_y < 4);
@@ -84,7 +128,7 @@ swizzle_aos(struct lp_build_tgsi_context *bld_base,
    swizzles[bld->inv_swizzles[2]] = bld->swizzles[swizzle_z];
    swizzles[bld->inv_swizzles[3]] = bld->swizzles[swizzle_w];
 
-   return lp_build_swizzle_aos(&bld->bld_base.base, a, swizzles);
+   return lp_build_swizzle_aos(&bld->base, a, swizzles);
 }
 
 
@@ -94,137 +138,149 @@ swizzle_scalar_aos(struct lp_build_tgsi_aos_context *bld,
                    unsigned chan)
 {
    chan = bld->swizzles[chan];
-   return lp_build_swizzle_scalar_aos(&bld->bld_base.base, a, chan, 4);
+   return lp_build_swizzle_scalar_aos(&bld->base, a, chan);
 }
 
 
+/**
+ * Register fetch.
+ */
 static LLVMValueRef
-emit_fetch_constant(
-   struct lp_build_tgsi_context * bld_base,
-   const struct tgsi_full_src_register * reg,
-   enum tgsi_opcode_type stype,
-   unsigned swizzle)
+emit_fetch(
+   struct lp_build_tgsi_aos_context *bld,
+   const struct tgsi_full_instruction *inst,
+   unsigned src_op)
 {
-   struct lp_build_tgsi_aos_context * bld = lp_aos_context(bld_base);
-   LLVMBuilderRef builder = bld_base->base.gallivm->builder;
-   struct lp_type type = bld_base->base.type;
+   LLVMBuilderRef builder = bld->base.gallivm->builder;
+   struct lp_type type = bld->base.type;
+   const struct tgsi_full_src_register *reg = &inst->Src[src_op];
    LLVMValueRef res;
    unsigned chan;
 
    assert(!reg->Register.Indirect);
 
    /*
-    * Get the constants components
+    * Fetch the from the register file.
     */
 
-   res = bld->bld_base.base.undef;
-   for (chan = 0; chan < 4; ++chan) {
-      LLVMValueRef index;
-      LLVMValueRef scalar_ptr;
-      LLVMValueRef scalar;
-      LLVMValueRef swizzle;
-
-      index = lp_build_const_int32(bld->bld_base.base.gallivm,
-                                   reg->Register.Index * 4 + chan);
-
-      scalar_ptr = LLVMBuildGEP(builder, bld->consts_ptr, &index, 1, "");
-
-      scalar = LLVMBuildLoad(builder, scalar_ptr, "");
-
-      lp_build_name(scalar, "const[%u].%c", reg->Register.Index, "xyzw"[chan]);
-
+   switch (reg->Register.File) {
+   case TGSI_FILE_CONSTANT:
       /*
-       * NOTE: constants array is always assumed to be RGBA
+       * Get the constants components
        */
 
-      swizzle = lp_build_const_int32(bld->bld_base.base.gallivm,
-                                     bld->swizzles[chan]);
+      res = bld->base.undef;
+      for (chan = 0; chan < 4; ++chan) {
+         LLVMValueRef index;
+         LLVMValueRef scalar_ptr;
+         LLVMValueRef scalar;
+         LLVMValueRef swizzle;
 
-      res = LLVMBuildInsertElement(builder, res, scalar, swizzle, "");
+         index = lp_build_const_int32(bld->base.gallivm, reg->Register.Index * 4 + chan);
+
+         scalar_ptr = LLVMBuildGEP(builder, bld->consts_ptr,
+                                   &index, 1, "");
+
+         scalar = LLVMBuildLoad(builder, scalar_ptr, "");
+
+         lp_build_name(scalar, "const[%u].%c", reg->Register.Index, "xyzw"[chan]);
+
+         /*
+          * NOTE: constants array is always assumed to be RGBA
+          */
+
+         swizzle = lp_build_const_int32(bld->base.gallivm, chan);
+
+         res = LLVMBuildInsertElement(builder, res, scalar, swizzle, "");
+      }
+
+      /*
+       * Broadcast the first quaternion to all others.
+       *
+       * XXX: could be factored into a reusable function.
+       */
+
+      if (type.length > 4) {
+         LLVMValueRef shuffles[LP_MAX_VECTOR_LENGTH];
+         unsigned i;
+
+         for (chan = 0; chan < 4; ++chan) {
+            shuffles[chan] = lp_build_const_int32(bld->base.gallivm, chan);
+         }
+
+         for (i = 4; i < type.length; ++i) {
+            shuffles[i] = shuffles[i % 4];
+         }
+
+         res = LLVMBuildShuffleVector(builder,
+                                      res, bld->base.undef,
+                                      LLVMConstVector(shuffles, type.length),
+                                      "");
+      }
+      break;
+
+   case TGSI_FILE_IMMEDIATE:
+      res = bld->immediates[reg->Register.Index];
+      assert(res);
+      break;
+
+   case TGSI_FILE_INPUT:
+      res = bld->inputs[reg->Register.Index];
+      assert(res);
+      break;
+
+   case TGSI_FILE_TEMPORARY:
+      {
+         LLVMValueRef temp_ptr;
+         temp_ptr = bld->temps[reg->Register.Index];
+         res = LLVMBuildLoad(builder, temp_ptr, "");
+         if (!res)
+            return bld->base.undef;
+      }
+      break;
+
+   default:
+      assert(0 && "invalid src register in emit_fetch()");
+      return bld->base.undef;
    }
 
    /*
-    * Broadcast the first quaternion to all others.
-    *
-    * XXX: could be factored into a reusable function.
+    * Apply sign modifier.
     */
 
-   if (type.length > 4) {
-      LLVMValueRef shuffles[LP_MAX_VECTOR_LENGTH];
-      unsigned i;
-
-      for (chan = 0; chan < 4; ++chan) {
-         shuffles[chan] = lp_build_const_int32(bld->bld_base.base.gallivm, chan);
-      }
-
-      for (i = 4; i < type.length; ++i) {
-         shuffles[i] = shuffles[i % 4];
-      }
-
-      res = LLVMBuildShuffleVector(builder,
-                                   res, bld->bld_base.base.undef,
-                                   LLVMConstVector(shuffles, type.length),
-                                   "");
+   if (reg->Register.Absolute) {
+      res = lp_build_abs(&bld->base, res);
    }
-   return res;
-}
 
-static LLVMValueRef
-emit_fetch_immediate(
-   struct lp_build_tgsi_context * bld_base,
-   const struct tgsi_full_src_register * reg,
-   enum tgsi_opcode_type stype,
-   unsigned swizzle)
-{
-   struct lp_build_tgsi_aos_context * bld = lp_aos_context(bld_base);
-   LLVMValueRef res = bld->immediates[reg->Register.Index];
-   assert(res);
-   return res;
-}
+   if(reg->Register.Negate) {
+      res = lp_build_negate(&bld->base, res);
+   }
 
-static LLVMValueRef
-emit_fetch_input(
-   struct lp_build_tgsi_context * bld_base,
-   const struct tgsi_full_src_register * reg,
-   enum tgsi_opcode_type stype,
-   unsigned swizzle)
-{
-   struct lp_build_tgsi_aos_context * bld = lp_aos_context(bld_base);
-   LLVMValueRef res = bld->inputs[reg->Register.Index];
-   assert(!reg->Register.Indirect);
-   assert(res);
-   return res;
-}
+   /*
+    * Swizzle the argument
+    */
 
-static LLVMValueRef
-emit_fetch_temporary(
-   struct lp_build_tgsi_context * bld_base,
-   const struct tgsi_full_src_register * reg,
-   enum tgsi_opcode_type stype,
-   unsigned swizzle)
-{
-   struct lp_build_tgsi_aos_context * bld = lp_aos_context(bld_base);
-   LLVMBuilderRef builder = bld_base->base.gallivm->builder;
-   LLVMValueRef temp_ptr = bld->temps[reg->Register.Index];
-   LLVMValueRef res = LLVMBuildLoad(builder, temp_ptr, "");
-   assert(!reg->Register.Indirect);
-   if (!res)
-      return bld->bld_base.base.undef;
+   res = swizzle_aos(bld, res,
+                     reg->Register.SwizzleX,
+                     reg->Register.SwizzleY,
+                     reg->Register.SwizzleZ,
+                     reg->Register.SwizzleW);
 
    return res;
 }
+
 
 /**
  * Register store.
  */
-void
-lp_emit_store_aos(
+static void
+emit_store(
    struct lp_build_tgsi_aos_context *bld,
    const struct tgsi_full_instruction *inst,
    unsigned index,
    LLVMValueRef value)
 {
-   LLVMBuilderRef builder = bld->bld_base.base.gallivm->builder;
+   LLVMBuilderRef builder = bld->base.gallivm->builder;
    const struct tgsi_full_dst_register *reg = &inst->Dst[index];
    LLVMValueRef mask = NULL;
    LLVMValueRef ptr;
@@ -238,13 +294,13 @@ lp_emit_store_aos(
       break;
 
    case TGSI_SAT_ZERO_ONE:
-      value = lp_build_max(&bld->bld_base.base, value, bld->bld_base.base.zero);
-      value = lp_build_min(&bld->bld_base.base, value, bld->bld_base.base.one);
+      value = lp_build_max(&bld->base, value, bld->base.zero);
+      value = lp_build_min(&bld->base, value, bld->base.one);
       break;
 
    case TGSI_SAT_MINUS_PLUS_ONE:
-      value = lp_build_max(&bld->bld_base.base, value, lp_build_const_vec(bld->bld_base.base.gallivm, bld->bld_base.base.type, -1.0));
-      value = lp_build_min(&bld->bld_base.base, value, bld->bld_base.base.one);
+      value = lp_build_max(&bld->base, value, lp_build_const_vec(bld->base.gallivm, bld->base.type, -1.0));
+      value = lp_build_min(&bld->base, value, bld->base.one);
       break;
 
    default:
@@ -279,8 +335,6 @@ lp_emit_store_aos(
       return;
    }
 
-   if (!ptr)
-      return;
    /*
     * Predicate
     */
@@ -296,17 +350,17 @@ lp_emit_store_aos(
       /*
        * Convert the value to an integer mask.
        */
-      pred = lp_build_compare(bld->bld_base.base.gallivm,
-                               bld->bld_base.base.type,
+      pred = lp_build_compare(bld->base.gallivm,
+                               bld->base.type,
                                PIPE_FUNC_NOTEQUAL,
                                pred,
-                               bld->bld_base.base.zero);
+                               bld->base.zero);
 
       if (inst->Predicate.Negate) {
          pred = LLVMBuildNot(builder, pred, "");
       }
 
-      pred = bld->bld_base.emit_swizzle(&bld->bld_base, pred,
+      pred = swizzle_aos(bld, pred,
                          inst->Predicate.SwizzleX,
                          inst->Predicate.SwizzleY,
                          inst->Predicate.SwizzleZ,
@@ -326,11 +380,8 @@ lp_emit_store_aos(
    if (reg->Register.WriteMask != TGSI_WRITEMASK_XYZW) {
       LLVMValueRef writemask;
 
-      writemask = lp_build_const_mask_aos_swizzled(bld->bld_base.base.gallivm,
-                                                   bld->bld_base.base.type,
-                                                   reg->Register.WriteMask,
-                                                   TGSI_NUM_CHANNELS,
-                                                   bld->swizzles);
+      writemask = lp_build_const_mask_aos(bld->base.gallivm, bld->base.type,
+                                          reg->Register.WriteMask);
 
       if (mask) {
          mask = LLVMBuildAnd(builder, mask, writemask, "");
@@ -343,7 +394,7 @@ lp_emit_store_aos(
       LLVMValueRef orig_value;
 
       orig_value = LLVMBuildLoad(builder, ptr, "");
-      value = lp_build_select(&bld->bld_base.base,
+      value = lp_build_select(&bld->base,
                               mask, value, orig_value);
    }
 
@@ -363,41 +414,49 @@ emit_tex(struct lp_build_tgsi_aos_context *bld,
    unsigned target;
    unsigned unit;
    LLVMValueRef coords;
-   struct lp_derivatives derivs = { {NULL}, {NULL} };
+   LLVMValueRef ddx;
+   LLVMValueRef ddy;
 
    if (!bld->sampler) {
       _debug_printf("warning: found texture instruction but no sampler generator supplied\n");
-      return bld->bld_base.base.undef;
+      return bld->base.undef;
    }
 
    target = inst->Texture.Texture;
 
-   coords = lp_build_emit_fetch( &bld->bld_base, inst, 0 , LP_CHAN_ALL);
+   coords = emit_fetch( bld, inst, 0 );
 
    if (modifier == LP_BLD_TEX_MODIFIER_EXPLICIT_DERIV) {
-      /* probably not going to work */
-      derivs.ddx[0] = lp_build_emit_fetch( &bld->bld_base, inst, 1 , LP_CHAN_ALL);
-      derivs.ddy[0] = lp_build_emit_fetch( &bld->bld_base, inst, 2 , LP_CHAN_ALL);
+      ddx = emit_fetch( bld, inst, 1 );
+      ddy = emit_fetch( bld, inst, 2 );
       unit = inst->Src[3].Register.Index;
-   }
-   else {
+   }  else {
+#if 0
+      ddx = lp_build_ddx( &bld->base, coords );
+      ddy = lp_build_ddy( &bld->base, coords );
+#else
+      /* TODO */
+      ddx = bld->base.one;
+      ddy = bld->base.one;
+#endif
       unit = inst->Src[1].Register.Index;
    }
+
    return bld->sampler->emit_fetch_texel(bld->sampler,
-                                         &bld->bld_base.base,
+                                         &bld->base,
                                          target, unit,
-                                         coords, derivs,
+                                         coords, ddx, ddy,
                                          modifier);
 }
 
 
-void
-lp_emit_declaration_aos(
+static void
+emit_declaration(
    struct lp_build_tgsi_aos_context *bld,
    const struct tgsi_full_declaration *decl)
 {
-   struct gallivm_state *gallivm = bld->bld_base.base.gallivm;
-   LLVMTypeRef vec_type = lp_build_vec_type(bld->bld_base.base.gallivm, bld->bld_base.base.type);
+   struct gallivm_state *gallivm = bld->base.gallivm;
+   LLVMTypeRef vec_type = lp_build_vec_type(bld->base.gallivm, bld->base.type);
 
    unsigned first = decl->Range.First;
    unsigned last = decl->Range.Last;
@@ -406,10 +465,10 @@ lp_emit_declaration_aos(
    for (idx = first; idx <= last; ++idx) {
       switch (decl->Declaration.File) {
       case TGSI_FILE_TEMPORARY:
-         assert(idx < LP_MAX_INLINED_TEMPS);
+         assert(idx < LP_MAX_TGSI_TEMPS);
          if (bld->indirect_files & (1 << TGSI_FILE_TEMPORARY)) {
             LLVMValueRef array_size = lp_build_const_int32(gallivm, last + 1);
-            bld->temps_array = lp_build_array_alloca(bld->bld_base.base.gallivm,
+            bld->temps_array = lp_build_array_alloca(bld->base.gallivm,
                                                      vec_type, array_size, "");
          } else {
             bld->temps[idx] = lp_build_alloca(gallivm, vec_type, "");
@@ -442,8 +501,8 @@ lp_emit_declaration_aos(
  * Emit LLVM for one TGSI instruction.
  * \param return TRUE for success, FALSE otherwise
  */
-boolean
-lp_emit_instruction_aos(
+static boolean
+emit_instruction(
    struct lp_build_tgsi_aos_context *bld,
    const struct tgsi_full_instruction *inst,
    const struct tgsi_opcode_info *info,
@@ -468,17 +527,17 @@ lp_emit_instruction_aos(
 
    assert(info->num_dst <= 1);
    if (info->num_dst) {
-      dst0 = bld->bld_base.base.undef;
+      dst0 = bld->base.undef;
    }
 
    switch (inst->Instruction.Opcode) {
    case TGSI_OPCODE_ARL:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      dst0 = lp_build_floor(&bld->bld_base.base, src0);
+      src0 = emit_fetch(bld, inst, 0);
+      dst0 = lp_build_floor(&bld->base, src0);
       break;
 
    case TGSI_OPCODE_MOV:
-      dst0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
+      dst0 = emit_fetch(bld, inst, 0);
       break;
 
    case TGSI_OPCODE_LIT:
@@ -486,15 +545,15 @@ lp_emit_instruction_aos(
 
    case TGSI_OPCODE_RCP:
    /* TGSI_OPCODE_RECIP */
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      dst0 = lp_build_rcp(&bld->bld_base.base, src0);
+      src0 = emit_fetch(bld, inst, 0);
+      dst0 = lp_build_rcp(&bld->base, src0);
       break;
 
    case TGSI_OPCODE_RSQ:
    /* TGSI_OPCODE_RECIPSQRT */
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      tmp0 = lp_build_emit_llvm_unary(&bld->bld_base, TGSI_OPCODE_ABS, src0);
-      dst0 = lp_build_rsqrt(&bld->bld_base.base, tmp0);
+      src0 = emit_fetch(bld, inst, 0);
+      tmp0 = lp_build_abs(&bld->base, src0);
+      dst0 = lp_build_rsqrt(&bld->base, tmp0);
       break;
 
    case TGSI_OPCODE_EXP:
@@ -504,15 +563,15 @@ lp_emit_instruction_aos(
       return FALSE;
 
    case TGSI_OPCODE_MUL:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      src1 = lp_build_emit_fetch(&bld->bld_base, inst, 1, LP_CHAN_ALL);
-      dst0 = lp_build_mul(&bld->bld_base.base, src0, src1);
+      src0 = emit_fetch(bld, inst, 0);
+      src1 = emit_fetch(bld, inst, 1);
+      dst0 = lp_build_mul(&bld->base, src0, src1);
       break;
 
    case TGSI_OPCODE_ADD:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      src1 = lp_build_emit_fetch(&bld->bld_base, inst, 1, LP_CHAN_ALL);
-      dst0 = lp_build_add(&bld->bld_base.base, src0, src1);
+      src0 = emit_fetch(bld, inst, 0);
+      src1 = emit_fetch(bld, inst, 1);
+      dst0 = lp_build_add(&bld->base, src0, src1);
       break;
 
    case TGSI_OPCODE_DP3:
@@ -527,115 +586,120 @@ lp_emit_instruction_aos(
       return FALSE;
 
    case TGSI_OPCODE_MIN:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      src1 = lp_build_emit_fetch(&bld->bld_base, inst, 1, LP_CHAN_ALL);
-      dst0 = lp_build_min(&bld->bld_base.base, src0, src1);
+      src0 = emit_fetch(bld, inst, 0);
+      src1 = emit_fetch(bld, inst, 1);
+      dst0 = lp_build_max(&bld->base, src0, src1);
       break;
 
    case TGSI_OPCODE_MAX:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      src1 = lp_build_emit_fetch(&bld->bld_base, inst, 1, LP_CHAN_ALL);
-      dst0 = lp_build_max(&bld->bld_base.base, src0, src1);
+      src0 = emit_fetch(bld, inst, 0);
+      src1 = emit_fetch(bld, inst, 1);
+      dst0 = lp_build_max(&bld->base, src0, src1);
       break;
 
    case TGSI_OPCODE_SLT:
    /* TGSI_OPCODE_SETLT */
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      src1 = lp_build_emit_fetch(&bld->bld_base, inst, 1, LP_CHAN_ALL);
-      tmp0 = lp_build_cmp(&bld->bld_base.base, PIPE_FUNC_LESS, src0, src1);
-      dst0 = lp_build_select(&bld->bld_base.base, tmp0, bld->bld_base.base.one, bld->bld_base.base.zero);
+      src0 = emit_fetch(bld, inst, 0);
+      src1 = emit_fetch(bld, inst, 1);
+      tmp0 = lp_build_cmp(&bld->base, PIPE_FUNC_LESS, src0, src1);
+      dst0 = lp_build_select(&bld->base, tmp0, bld->base.one, bld->base.zero);
       break;
 
    case TGSI_OPCODE_SGE:
    /* TGSI_OPCODE_SETGE */
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      src1 = lp_build_emit_fetch(&bld->bld_base, inst, 1, LP_CHAN_ALL);
-      tmp0 = lp_build_cmp(&bld->bld_base.base, PIPE_FUNC_GEQUAL, src0, src1);
-      dst0 = lp_build_select(&bld->bld_base.base, tmp0, bld->bld_base.base.one, bld->bld_base.base.zero);
+      src0 = emit_fetch(bld, inst, 0);
+      src1 = emit_fetch(bld, inst, 1);
+      tmp0 = lp_build_cmp(&bld->base, PIPE_FUNC_GEQUAL, src0, src1);
+      dst0 = lp_build_select(&bld->base, tmp0, bld->base.one, bld->base.zero);
       break;
 
    case TGSI_OPCODE_MAD:
    /* TGSI_OPCODE_MADD */
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      src1 = lp_build_emit_fetch(&bld->bld_base, inst, 1, LP_CHAN_ALL);
-      src2 = lp_build_emit_fetch(&bld->bld_base, inst, 2, LP_CHAN_ALL);
-      tmp0 = lp_build_mul(&bld->bld_base.base, src0, src1);
-      dst0 = lp_build_add(&bld->bld_base.base, tmp0, src2);
+      src0 = emit_fetch(bld, inst, 0);
+      src1 = emit_fetch(bld, inst, 1);
+      src2 = emit_fetch(bld, inst, 2);
+      tmp0 = lp_build_mul(&bld->base, src0, src1);
+      dst0 = lp_build_add(&bld->base, tmp0, src2);
       break;
 
    case TGSI_OPCODE_SUB:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      src1 = lp_build_emit_fetch(&bld->bld_base, inst, 1, LP_CHAN_ALL);
-      dst0 = lp_build_sub(&bld->bld_base.base, src0, src1);
+      src0 = emit_fetch(bld, inst, 0);
+      src1 = emit_fetch(bld, inst, 1);
+      dst0 = lp_build_sub(&bld->base, src0, src1);
       break;
 
    case TGSI_OPCODE_LRP:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      src1 = lp_build_emit_fetch(&bld->bld_base, inst, 1, LP_CHAN_ALL);
-      src2 = lp_build_emit_fetch(&bld->bld_base, inst, 2, LP_CHAN_ALL);
-      tmp0 = lp_build_sub(&bld->bld_base.base, src1, src2);
-      tmp0 = lp_build_mul(&bld->bld_base.base, src0, tmp0);
-      dst0 = lp_build_add(&bld->bld_base.base, tmp0, src2);
+      src0 = emit_fetch(bld, inst, 0);
+      src1 = emit_fetch(bld, inst, 1);
+      src2 = emit_fetch(bld, inst, 2);
+      tmp0 = lp_build_sub(&bld->base, src1, src2);
+      tmp0 = lp_build_mul(&bld->base, src0, tmp0);
+      dst0 = lp_build_add(&bld->base, tmp0, src2);
       break;
 
    case TGSI_OPCODE_CND:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      src1 = lp_build_emit_fetch(&bld->bld_base, inst, 1, LP_CHAN_ALL);
-      src2 = lp_build_emit_fetch(&bld->bld_base, inst, 2, LP_CHAN_ALL);
-      tmp1 = lp_build_const_vec(bld->bld_base.base.gallivm, bld->bld_base.base.type, 0.5);
-      tmp0 = lp_build_cmp(&bld->bld_base.base, PIPE_FUNC_GREATER, src2, tmp1);
-      dst0 = lp_build_select(&bld->bld_base.base, tmp0, src0, src1);
+      src0 = emit_fetch(bld, inst, 0);
+      src1 = emit_fetch(bld, inst, 1);
+      src2 = emit_fetch(bld, inst, 2);
+      tmp1 = lp_build_const_vec(bld->base.gallivm, bld->base.type, 0.5);
+      tmp0 = lp_build_cmp(&bld->base, PIPE_FUNC_GREATER, src2, tmp1);
+      dst0 = lp_build_select(&bld->base, tmp0, src0, src1);
       break;
 
    case TGSI_OPCODE_DP2A:
       return FALSE;
 
    case TGSI_OPCODE_FRC:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      tmp0 = lp_build_floor(&bld->bld_base.base, src0);
-      dst0 = lp_build_sub(&bld->bld_base.base, src0, tmp0);
+      src0 = emit_fetch(bld, inst, 0);
+      tmp0 = lp_build_floor(&bld->base, src0);
+      dst0 = lp_build_sub(&bld->base, src0, tmp0);
       break;
 
    case TGSI_OPCODE_CLAMP:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      src1 = lp_build_emit_fetch(&bld->bld_base, inst, 1, LP_CHAN_ALL);
-      src2 = lp_build_emit_fetch(&bld->bld_base, inst, 2, LP_CHAN_ALL);
-      tmp0 = lp_build_max(&bld->bld_base.base, src0, src1);
-      dst0 = lp_build_min(&bld->bld_base.base, tmp0, src2);
+      src0 = emit_fetch(bld, inst, 0);
+      src1 = emit_fetch(bld, inst, 1);
+      src2 = emit_fetch(bld, inst, 2);
+      tmp0 = lp_build_max(&bld->base, src0, src1);
+      dst0 = lp_build_min(&bld->base, tmp0, src2);
       break;
 
    case TGSI_OPCODE_FLR:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      dst0 = lp_build_floor(&bld->bld_base.base, src0);
+      src0 = emit_fetch(bld, inst, 0);
+      dst0 = lp_build_floor(&bld->base, src0);
       break;
 
    case TGSI_OPCODE_ROUND:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      dst0 = lp_build_round(&bld->bld_base.base, src0);
+      src0 = emit_fetch(bld, inst, 0);
+      dst0 = lp_build_round(&bld->base, src0);
       break;
 
    case TGSI_OPCODE_EX2:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      tmp0 = lp_build_swizzle_scalar_aos(&bld->bld_base.base, src0, TGSI_SWIZZLE_X, TGSI_NUM_CHANNELS);
-      dst0 = lp_build_exp2(&bld->bld_base.base, tmp0);
+      src0 = emit_fetch(bld, inst, 0);
+      tmp0 = lp_build_swizzle_scalar_aos(&bld->base, src0, TGSI_SWIZZLE_X);
+      dst0 = lp_build_exp2(&bld->base, tmp0);
       break;
 
    case TGSI_OPCODE_LG2:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
+      src0 = emit_fetch(bld, inst, 0);
       tmp0 = swizzle_scalar_aos(bld, src0, TGSI_SWIZZLE_X);
-      dst0 = lp_build_log2(&bld->bld_base.base, tmp0);
+      dst0 = lp_build_log2(&bld->base, tmp0);
       break;
 
    case TGSI_OPCODE_POW:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
+      src0 = emit_fetch(bld, inst, 0);
       src0 = swizzle_scalar_aos(bld, src0, TGSI_SWIZZLE_X);
-      src1 = lp_build_emit_fetch(&bld->bld_base, inst, 1, LP_CHAN_ALL);
+      src1 = emit_fetch(bld, inst, 1);
       src1 = swizzle_scalar_aos(bld, src1, TGSI_SWIZZLE_X);
-      dst0 = lp_build_pow(&bld->bld_base.base, src0, src1);
+      dst0 = lp_build_pow(&bld->base, src0, src1);
       break;
 
    case TGSI_OPCODE_XPD:
       return FALSE;
+
+   case TGSI_OPCODE_ABS:
+      src0 = emit_fetch(bld, inst, 0);
+      dst0 = lp_build_abs(&bld->base, src0);
+      break;
 
    case TGSI_OPCODE_RCC:
       /* deprecated? */
@@ -646,9 +710,9 @@ lp_emit_instruction_aos(
       return FALSE;
 
    case TGSI_OPCODE_COS:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
+      src0 = emit_fetch(bld, inst, 0);
       tmp0 = swizzle_scalar_aos(bld, src0, TGSI_SWIZZLE_X);
-      dst0 = lp_build_cos(&bld->bld_base.base, tmp0);
+      dst0 = lp_build_cos(&bld->base, tmp0);
       break;
 
    case TGSI_OPCODE_DDX:
@@ -657,10 +721,12 @@ lp_emit_instruction_aos(
    case TGSI_OPCODE_DDY:
       return FALSE;
 
-   case TGSI_OPCODE_KILL:
+   case TGSI_OPCODE_KILP:
+      /* predicated kill */
       return FALSE;
 
-   case TGSI_OPCODE_KILL_IF:
+   case TGSI_OPCODE_KIL:
+      /* conditional kill */
       return FALSE;
 
    case TGSI_OPCODE_PK2H:
@@ -682,45 +748,45 @@ lp_emit_instruction_aos(
       return FALSE;
 
    case TGSI_OPCODE_SEQ:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      src1 = lp_build_emit_fetch(&bld->bld_base, inst, 1, LP_CHAN_ALL);
-      tmp0 = lp_build_cmp(&bld->bld_base.base, PIPE_FUNC_EQUAL, src0, src1);
-      dst0 = lp_build_select(&bld->bld_base.base, tmp0, bld->bld_base.base.one, bld->bld_base.base.zero);
+      src0 = emit_fetch(bld, inst, 0);
+      src1 = emit_fetch(bld, inst, 1);
+      tmp0 = lp_build_cmp(&bld->base, PIPE_FUNC_EQUAL, src0, src1);
+      dst0 = lp_build_select(&bld->base, tmp0, bld->base.one, bld->base.zero);
       break;
 
    case TGSI_OPCODE_SFL:
-      dst0 = bld->bld_base.base.zero;
+      dst0 = bld->base.zero;
       break;
 
    case TGSI_OPCODE_SGT:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      src1 = lp_build_emit_fetch(&bld->bld_base, inst, 1, LP_CHAN_ALL);
-      tmp0 = lp_build_cmp(&bld->bld_base.base, PIPE_FUNC_GREATER, src0, src1);
-      dst0 = lp_build_select(&bld->bld_base.base, tmp0, bld->bld_base.base.one, bld->bld_base.base.zero);
+      src0 = emit_fetch(bld, inst, 0);
+      src1 = emit_fetch(bld, inst, 1);
+      tmp0 = lp_build_cmp(&bld->base, PIPE_FUNC_GREATER, src0, src1);
+      dst0 = lp_build_select(&bld->base, tmp0, bld->base.one, bld->base.zero);
       break;
 
    case TGSI_OPCODE_SIN:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
+      src0 = emit_fetch(bld, inst, 0);
       tmp0 = swizzle_scalar_aos(bld, src0, TGSI_SWIZZLE_X);
-      dst0 = lp_build_sin(&bld->bld_base.base, tmp0);
+      dst0 = lp_build_sin(&bld->base, tmp0);
       break;
 
    case TGSI_OPCODE_SLE:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      src1 = lp_build_emit_fetch(&bld->bld_base, inst, 1, LP_CHAN_ALL);
-      tmp0 = lp_build_cmp(&bld->bld_base.base, PIPE_FUNC_LEQUAL, src0, src1);
-      dst0 = lp_build_select(&bld->bld_base.base, tmp0, bld->bld_base.base.one, bld->bld_base.base.zero);
+      src0 = emit_fetch(bld, inst, 0);
+      src1 = emit_fetch(bld, inst, 1);
+      tmp0 = lp_build_cmp(&bld->base, PIPE_FUNC_LEQUAL, src0, src1);
+      dst0 = lp_build_select(&bld->base, tmp0, bld->base.one, bld->base.zero);
       break;
 
    case TGSI_OPCODE_SNE:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      src1 = lp_build_emit_fetch(&bld->bld_base, inst, 1, LP_CHAN_ALL);
-      tmp0 = lp_build_cmp(&bld->bld_base.base, PIPE_FUNC_NOTEQUAL, src0, src1);
-      dst0 = lp_build_select(&bld->bld_base.base, tmp0, bld->bld_base.base.one, bld->bld_base.base.zero);
+      src0 = emit_fetch(bld, inst, 0);
+      src1 = emit_fetch(bld, inst, 1);
+      tmp0 = lp_build_cmp(&bld->base, PIPE_FUNC_NOTEQUAL, src0, src1);
+      dst0 = lp_build_select(&bld->base, tmp0, bld->base.one, bld->base.zero);
       break;
 
    case TGSI_OPCODE_STR:
-      dst0 = bld->bld_base.base.one;
+      dst0 = bld->base.one;
       break;
 
    case TGSI_OPCODE_TEX:
@@ -768,8 +834,8 @@ lp_emit_instruction_aos(
       break;
 
    case TGSI_OPCODE_ARR:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      dst0 = lp_build_round(&bld->bld_base.base, src0);
+      src0 = emit_fetch(bld, inst, 0);
+      dst0 = lp_build_round(&bld->base, src0);
       break;
 
    case TGSI_OPCODE_BRA:
@@ -790,16 +856,16 @@ lp_emit_instruction_aos(
 
    case TGSI_OPCODE_SSG:
    /* TGSI_OPCODE_SGN */
-      tmp0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      dst0 = lp_build_sgn(&bld->bld_base.base, tmp0);
+      tmp0 = emit_fetch(bld, inst, 0);
+      dst0 = lp_build_sgn(&bld->base, tmp0);
       break;
 
    case TGSI_OPCODE_CMP:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      src1 = lp_build_emit_fetch(&bld->bld_base, inst, 1, LP_CHAN_ALL);
-      src2 = lp_build_emit_fetch(&bld->bld_base, inst, 2, LP_CHAN_ALL);
-      tmp0 = lp_build_cmp(&bld->bld_base.base, PIPE_FUNC_LESS, src0, bld->bld_base.base.zero);
-      dst0 = lp_build_select(&bld->bld_base.base, tmp0, src1, src2);
+      src0 = emit_fetch(bld, inst, 0);
+      src1 = emit_fetch(bld, inst, 1);
+      src2 = emit_fetch(bld, inst, 2);
+      tmp0 = lp_build_cmp(&bld->base, PIPE_FUNC_LESS, src0, bld->base.zero);
+      dst0 = lp_build_select(&bld->base, tmp0, src1, src2);
       break;
 
    case TGSI_OPCODE_SCS:
@@ -835,7 +901,6 @@ lp_emit_instruction_aos(
       return FALSE;
 
    case TGSI_OPCODE_IF:
-   case TGSI_OPCODE_UIF:
       return FALSE;
 
    case TGSI_OPCODE_BGNLOOP:
@@ -869,8 +934,8 @@ lp_emit_instruction_aos(
       break;
 
    case TGSI_OPCODE_CEIL:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      dst0 = lp_build_ceil(&bld->bld_base.base, src0);
+      src0 = emit_fetch(bld, inst, 0);
+      dst0 = lp_build_ceil(&bld->base, src0);
       break;
 
    case TGSI_OPCODE_I2F:
@@ -886,8 +951,8 @@ lp_emit_instruction_aos(
       break;
 
    case TGSI_OPCODE_TRUNC:
-      src0 = lp_build_emit_fetch(&bld->bld_base, inst, 0, LP_CHAN_ALL);
-      dst0 = lp_build_trunc(&bld->bld_base.base, src0);
+      src0 = emit_fetch(bld, inst, 0);
+      dst0 = lp_build_trunc(&bld->base, src0);
       break;
 
    case TGSI_OPCODE_SHL:
@@ -963,7 +1028,7 @@ lp_emit_instruction_aos(
    }
    
    if (info->num_dst) {
-      lp_emit_store_aos(bld, inst, 0, dst0);
+      emit_store(bld, inst, 0, dst0);
    }
 
    return TRUE;
@@ -984,14 +1049,13 @@ lp_build_tgsi_aos(struct gallivm_state *gallivm,
    struct lp_build_tgsi_aos_context bld;
    struct tgsi_parse_context parse;
    uint num_immediates = 0;
+   uint num_instructions = 0;
    unsigned chan;
    int pc = 0;
 
    /* Setup build context */
    memset(&bld, 0, sizeof bld);
-   lp_build_context_init(&bld.bld_base.base, gallivm, type);
-   lp_build_context_init(&bld.bld_base.uint_bld, gallivm, lp_uint_type(type));
-   lp_build_context_init(&bld.bld_base.int_bld, gallivm, lp_int_type(type));
+   lp_build_context_init(&bld.base, gallivm, type);
    lp_build_context_init(&bld.int_bld, gallivm, lp_int_type(type));
 
    for (chan = 0; chan < 4; ++chan) {
@@ -1004,18 +1068,11 @@ lp_build_tgsi_aos(struct gallivm_state *gallivm,
    bld.consts_ptr = consts_ptr;
    bld.sampler = sampler;
    bld.indirect_files = info->indirect_files;
-   bld.bld_base.emit_swizzle = swizzle_aos;
-   bld.bld_base.info = info;
+   bld.instructions = (struct tgsi_full_instruction *)
+                      MALLOC(LP_MAX_INSTRUCTIONS * sizeof(struct tgsi_full_instruction));
+   bld.max_instructions = LP_MAX_INSTRUCTIONS;
 
-   bld.bld_base.emit_fetch_funcs[TGSI_FILE_CONSTANT] = emit_fetch_constant;
-   bld.bld_base.emit_fetch_funcs[TGSI_FILE_IMMEDIATE] = emit_fetch_immediate;
-   bld.bld_base.emit_fetch_funcs[TGSI_FILE_INPUT] = emit_fetch_input;
-   bld.bld_base.emit_fetch_funcs[TGSI_FILE_TEMPORARY] = emit_fetch_temporary;
-
-   /* Set opcode actions */
-   lp_set_default_actions_cpu(&bld.bld_base);
-
-   if (!lp_bld_tgsi_list_init(&bld.bld_base)) {
+   if (!bld.instructions) {
       return;
    }
 
@@ -1027,13 +1084,33 @@ lp_build_tgsi_aos(struct gallivm_state *gallivm,
       switch(parse.FullToken.Token.Type) {
       case TGSI_TOKEN_TYPE_DECLARATION:
          /* Inputs already interpolated */
-         lp_emit_declaration_aos(&bld, &parse.FullToken.FullDeclaration);
+         emit_declaration(&bld, &parse.FullToken.FullDeclaration);
          break;
 
       case TGSI_TOKEN_TYPE_INSTRUCTION:
-         /* save expanded instruction */
-         lp_bld_tgsi_add_instruction(&bld.bld_base,
-                                     &parse.FullToken.FullInstruction);
+         {
+            /* save expanded instruction */
+            if (num_instructions == bld.max_instructions) {
+               struct tgsi_full_instruction *instructions;
+               instructions = REALLOC(bld.instructions,
+                                      bld.max_instructions
+                                      * sizeof(struct tgsi_full_instruction),
+                                      (bld.max_instructions + LP_MAX_INSTRUCTIONS)
+                                      * sizeof(struct tgsi_full_instruction));
+               if (!instructions) {
+                  break;
+               }
+               bld.instructions = instructions;
+               bld.max_instructions += LP_MAX_INSTRUCTIONS;
+            }
+
+            memcpy(bld.instructions + num_instructions,
+                   &parse.FullToken.FullInstruction,
+                   sizeof(bld.instructions[0]));
+
+            num_instructions++;
+         }
+
          break;
 
       case TGSI_TOKEN_TYPE_IMMEDIATE:
@@ -1042,7 +1119,7 @@ lp_build_tgsi_aos(struct gallivm_state *gallivm,
             const uint size = parse.FullToken.FullImmediate.Immediate.NrTokens - 1;
             float imm[4];
             assert(size <= 4);
-            assert(num_immediates < LP_MAX_INLINED_IMMEDIATES);
+            assert(num_immediates < LP_MAX_TGSI_IMMEDIATES);
             for (chan = 0; chan < 4; ++chan) {
                imm[chan] = 0.0f;
             }
@@ -1067,10 +1144,10 @@ lp_build_tgsi_aos(struct gallivm_state *gallivm,
    }
 
    while (pc != -1) {
-      struct tgsi_full_instruction *instr = bld.bld_base.instructions + pc;
+      struct tgsi_full_instruction *instr = bld.instructions + pc;
       const struct tgsi_opcode_info *opcode_info =
          tgsi_get_opcode_info(instr->Instruction.Opcode);
-      if (!lp_emit_instruction_aos(&bld, instr, opcode_info, &pc))
+      if (!emit_instruction(&bld, instr, opcode_info, &pc))
          _debug_printf("warning: failed to translate tgsi opcode %s to LLVM\n",
                        opcode_info->mnemonic);
    }
@@ -1084,7 +1161,6 @@ lp_build_tgsi_aos(struct gallivm_state *gallivm,
       debug_printf("2222222222222222222222222222 \n");
    }
    tgsi_parse_free(&parse);
-   FREE(bld.bld_base.instructions);
 
    if (0) {
       LLVMModuleRef module = LLVMGetGlobalParent(
@@ -1092,5 +1168,6 @@ lp_build_tgsi_aos(struct gallivm_state *gallivm,
       LLVMDumpModule(module);
    }
 
+   FREE(bld.instructions);
 }
 

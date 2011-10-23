@@ -33,10 +33,10 @@
 #include "ir_visitor.h"
 #include "glsl_types.h"
 
-class ir_variable_refcount_entry
+class variable_entry : public exec_node
 {
 public:
-   ir_variable_refcount_entry(ir_variable *var);
+   variable_entry(ir_variable *var);
 
    ir_variable *var; /* The key: the variable's pointer. */
    ir_assignment *assign; /* An assignment to the variable, if any */
@@ -52,8 +52,16 @@ public:
 
 class ir_variable_refcount_visitor : public ir_hierarchical_visitor {
 public:
-   ir_variable_refcount_visitor(void);
-   ~ir_variable_refcount_visitor(void);
+   ir_variable_refcount_visitor(void)
+   {
+      this->mem_ctx = ralloc_context(NULL);
+      this->variable_list.make_empty();
+   }
+
+   ~ir_variable_refcount_visitor(void)
+   {
+      ralloc_free(this->mem_ctx);
+   }
 
    virtual ir_visitor_status visit(ir_variable *);
    virtual ir_visitor_status visit(ir_dereference_variable *);
@@ -61,9 +69,10 @@ public:
    virtual ir_visitor_status visit_enter(ir_function_signature *);
    virtual ir_visitor_status visit_leave(ir_assignment *);
 
-   ir_variable_refcount_entry *get_variable_entry(ir_variable *var);
+   variable_entry *get_variable_entry(ir_variable *var);
 
-   struct hash_table *ht;
+   /* List of variable_entry */
+   exec_list variable_list;
 
    void *mem_ctx;
 };

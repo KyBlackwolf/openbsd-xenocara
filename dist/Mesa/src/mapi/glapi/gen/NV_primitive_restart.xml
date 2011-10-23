@@ -11,11 +11,10 @@
     <enum name="PRIMITIVE_RESTART_NV"        value="0x8558"/>
     <enum name="PRIMITIVE_RESTART_INDEX_NV"  value="0x8559"/>
 
-    <function name="PrimitiveRestartNV" offset="assign" deprecated="3.1"
-              exec="dynamic">
+    <function name="PrimitiveRestartNV" offset="assign">
     </function>
 
-    <function name="PrimitiveRestartIndexNV" alias="PrimitiveRestartIndex">
+    <function name="PrimitiveRestartIndexNV" offset="assign">
 	<param name="index" type="GLuint"/>
     </function>
 

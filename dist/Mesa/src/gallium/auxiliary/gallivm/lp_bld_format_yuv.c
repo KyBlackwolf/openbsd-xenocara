@@ -72,15 +72,9 @@ uyvy_to_yuv_soa(struct gallivm_state *gallivm,
    assert(lp_check_value(type, i));
 
    /*
-    * Little endian:
     * y = (uyvy >> (16*i + 8)) & 0xff
     * u = (uyvy        ) & 0xff
     * v = (uyvy >> 16  ) & 0xff
-    *
-    * Big endian:
-    * y = (uyvy >> (-16*i + 16)) & 0xff
-    * u = (uyvy >> 24) & 0xff
-    * v = (uyvy >>  8) & 0xff
     */
 
 #if defined(PIPE_ARCH_X86) || defined(PIPE_ARCH_X86_64)
@@ -90,7 +84,7 @@ uyvy_to_yuv_soa(struct gallivm_state *gallivm,
     * per element. Didn't measure performance but cuts shader size
     * by quite a bit (less difference if cpu has no sse4.1 support).
     */
-   if (util_cpu_caps.has_sse2 && n > 1) {
+   if (util_cpu_caps.has_sse2 && n == 4) {
       LLVMValueRef sel, tmp, tmp2;
       struct lp_build_context bld32;
 
@@ -104,23 +98,13 @@ uyvy_to_yuv_soa(struct gallivm_state *gallivm,
 #endif
    {
       LLVMValueRef shift;
-#ifdef PIPE_ARCH_LITTLE_ENDIAN
       shift = LLVMBuildMul(builder, i, lp_build_const_int_vec(gallivm, type, 16), "");
       shift = LLVMBuildAdd(builder, shift, lp_build_const_int_vec(gallivm, type, 8), "");
-#else
-      shift = LLVMBuildMul(builder, i, lp_build_const_int_vec(gallivm, type, -16), "");
-      shift = LLVMBuildAdd(builder, shift, lp_build_const_int_vec(gallivm, type, 16), "");
-#endif
       *y = LLVMBuildLShr(builder, packed, shift, "");
    }
 
-#ifdef PIPE_ARCH_LITTLE_ENDIAN
    *u = packed;
    *v = LLVMBuildLShr(builder, packed, lp_build_const_int_vec(gallivm, type, 16), "");
-#else
-   *u = LLVMBuildLShr(builder, packed, lp_build_const_int_vec(gallivm, type, 24), "");
-   *v = LLVMBuildLShr(builder, packed, lp_build_const_int_vec(gallivm, type, 8), "");
-#endif
 
    mask = lp_build_const_int_vec(gallivm, type, 0xff);
 
@@ -156,15 +140,9 @@ yuyv_to_yuv_soa(struct gallivm_state *gallivm,
    assert(lp_check_value(type, i));
 
    /*
-   * Little endian:
     * y = (yuyv >> 16*i) & 0xff
     * u = (yuyv >> 8   ) & 0xff
     * v = (yuyv >> 24  ) & 0xff
-    *
-    * Big endian:
-    * y = (yuyv >> (-16*i + 24) & 0xff
-    * u = (yuyv >> 16)          & 0xff
-    * v = (yuyv)                & 0xff
     */
 
 #if defined(PIPE_ARCH_X86) || defined(PIPE_ARCH_X86_64)
@@ -174,7 +152,7 @@ yuyv_to_yuv_soa(struct gallivm_state *gallivm,
     * per element. Didn't measure performance but cuts shader size
     * by quite a bit (less difference if cpu has no sse4.1 support).
     */
-   if (util_cpu_caps.has_sse2 && n > 1) {
+   if (util_cpu_caps.has_sse2 && n == 4) {
       LLVMValueRef sel, tmp;
       struct lp_build_context bld32;
 
@@ -187,22 +165,12 @@ yuyv_to_yuv_soa(struct gallivm_state *gallivm,
 #endif
    {
       LLVMValueRef shift;
-#ifdef PIPE_ARCH_LITTLE_ENDIAN
       shift = LLVMBuildMul(builder, i, lp_build_const_int_vec(gallivm, type, 16), "");
-#else
-      shift = LLVMBuildMul(builder, i, lp_build_const_int_vec(gallivm, type, -16), "");
-      shift = LLVMBuildAdd(builder, shift, lp_build_const_int_vec(gallivm, type, 24), "");
-#endif
       *y = LLVMBuildLShr(builder, packed, shift, "");
    }
 
-#ifdef PIPE_ARCH_LITTLE_ENDIAN
    *u = LLVMBuildLShr(builder, packed, lp_build_const_int_vec(gallivm, type, 8), "");
    *v = LLVMBuildLShr(builder, packed, lp_build_const_int_vec(gallivm, type, 24), "");
-#else
-   *u = LLVMBuildLShr(builder, packed, lp_build_const_int_vec(gallivm, type, 16), "");
-   *v = packed;
-#endif
 
    mask = lp_build_const_int_vec(gallivm, type, 0xff);
 
@@ -334,17 +302,10 @@ rgb_to_rgba_aos(struct gallivm_state *gallivm,
     * Make a 4 x unorm8 vector
     */
 
-#ifdef PIPE_ARCH_LITTLE_ENDIAN
    r = r;
    g = LLVMBuildShl(builder, g, lp_build_const_int_vec(gallivm, type, 8), "");
    b = LLVMBuildShl(builder, b, lp_build_const_int_vec(gallivm, type, 16), "");
    a = lp_build_const_int_vec(gallivm, type, 0xff000000);
-#else
-   r = LLVMBuildShl(builder, r, lp_build_const_int_vec(gallivm, type, 24), "");
-   g = LLVMBuildShl(builder, g, lp_build_const_int_vec(gallivm, type, 16), "");
-   b = LLVMBuildShl(builder, b, lp_build_const_int_vec(gallivm, type, 8), "");
-   a = lp_build_const_int_vec(gallivm, type, 0x000000ff);
-#endif
 
    rgba = r;
    rgba = LLVMBuildOr(builder, rgba, g, "");
@@ -437,42 +398,6 @@ grgb_to_rgba_aos(struct gallivm_state *gallivm,
    return rgba;
 }
 
-/**
- * Convert from <n x i32> packed GR_BR to <4n x i8> RGBA AoS
- */
-static LLVMValueRef
-grbr_to_rgba_aos(struct gallivm_state *gallivm,
-                 unsigned n,
-                 LLVMValueRef packed,
-                 LLVMValueRef i)
-{
-   LLVMValueRef r, g, b;
-   LLVMValueRef rgba;
-
-   uyvy_to_yuv_soa(gallivm, n, packed, i, &r, &g, &b);
-   rgba = rgb_to_rgba_aos(gallivm, n, r, g, b);
-
-   return rgba;
-}
-
-
-/**
- * Convert from <n x i32> packed RG_RB to <4n x i8> RGBA AoS
- */
-static LLVMValueRef
-rgrb_to_rgba_aos(struct gallivm_state *gallivm,
-                 unsigned n,
-                 LLVMValueRef packed,
-                 LLVMValueRef i)
-{
-   LLVMValueRef r, g, b;
-   LLVMValueRef rgba;
-
-   yuyv_to_yuv_soa(gallivm, n, packed, i, &r, &g, &b);
-   rgba = rgb_to_rgba_aos(gallivm, n, r, g, b);
-
-   return rgba;
-}
 
 /**
  * @param n  is the number of pixels processed
@@ -497,7 +422,7 @@ lp_build_fetch_subsampled_rgba_aos(struct gallivm_state *gallivm,
    assert(format_desc->block.width == 2);
    assert(format_desc->block.height == 1);
 
-   packed = lp_build_gather(gallivm, n, 32, 32, base_ptr, offset, FALSE);
+   packed = lp_build_gather(gallivm, n, 32, 32, base_ptr, offset);
 
    (void)j;
 
@@ -513,12 +438,6 @@ lp_build_fetch_subsampled_rgba_aos(struct gallivm_state *gallivm,
       break;
    case PIPE_FORMAT_G8R8_G8B8_UNORM:
       rgba = grgb_to_rgba_aos(gallivm, n, packed, i);
-      break;
-   case PIPE_FORMAT_G8R8_B8R8_UNORM:
-      rgba = grbr_to_rgba_aos(gallivm, n, packed, i);
-      break;
-   case PIPE_FORMAT_R8G8_R8B8_UNORM:
-      rgba = rgrb_to_rgba_aos(gallivm, n, packed, i);
       break;
    default:
       assert(0);

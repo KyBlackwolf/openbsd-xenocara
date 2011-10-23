@@ -8,7 +8,7 @@
 
 <category name="GL_EXT_draw_buffers2" number="340">
 
-    <function name="ColorMaskIndexedEXT" alias="ColorMaski">
+    <function name="ColorMaskIndexedEXT" offset="assign">
 	<param name="buf" type="GLuint"/>
 	<param name="r" type="GLboolean"/>
 	<param name="g" type="GLboolean"/>
@@ -16,29 +16,29 @@
 	<param name="a" type="GLboolean"/>
     </function>
 
-    <function name="GetBooleanIndexedvEXT" alias="GetBooleani_v">
+    <function name="GetBooleanIndexedvEXT" offset="assign">
         <param name="value" type="GLenum"/>
 	<param name="index" type="GLuint"/>
 	<param name="data" type="GLboolean *"/>
     </function>
 
-    <function name="GetIntegerIndexedvEXT" alias="GetIntegeri_v">
+    <function name="GetIntegerIndexedvEXT" offset="assign">
         <param name="value" type="GLenum"/>
 	<param name="index" type="GLuint"/>
 	<param name="data" type="GLint *"/>
     </function>
 
-    <function name="EnableIndexedEXT" alias="Enablei">
+    <function name="EnableIndexedEXT" offset="assign">
         <param name="target" type="GLenum"/>
 	<param name="index" type="GLuint"/>
     </function>
 
-    <function name="DisableIndexedEXT" alias="Disablei">
+    <function name="DisableIndexedEXT" offset="assign">
         <param name="target" type="GLenum"/>
 	<param name="index" type="GLuint"/>
     </function>
 
-    <function name ="IsEnabledIndexedEXT" alias="IsEnabledi">
+    <function name ="IsEnabledIndexedEXT" offset="assign">
         <param name="target" type="GLenum"/>
 	<param name="index" type="GLuint"/>
 	<return type="GLboolean"/>

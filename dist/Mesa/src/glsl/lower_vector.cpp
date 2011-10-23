@@ -31,11 +31,9 @@
 #include "ir.h"
 #include "ir_rvalue_visitor.h"
 
-namespace {
-
 class lower_vector_visitor : public ir_rvalue_visitor {
 public:
-   lower_vector_visitor() : dont_lower_swz(false), progress(false)
+   lower_vector_visitor() : progress(false)
    {
       /* empty */
    }
@@ -49,8 +47,6 @@ public:
 
    bool progress;
 };
-
-} /* anonymous namespace */
 
 /**
  * Determine if an IR expression tree looks like an extended swizzle
@@ -187,7 +183,7 @@ lower_vector_visitor::handle_rvalue(ir_rvalue **rvalue)
    if (assigned > 0) {
       ir_constant *const c =
 	 new(mem_ctx) ir_constant(glsl_type::get_instance(expr->type->base_type,
-							  assigned, 1),
+							  assigned, 0),
 				  &d);
       ir_dereference *const lhs = new(mem_ctx) ir_dereference_variable(temp);
       ir_assignment *const assign =

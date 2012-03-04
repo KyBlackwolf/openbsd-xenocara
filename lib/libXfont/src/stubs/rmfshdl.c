@@ -3,7 +3,11 @@
 #endif
 #include "stubs.h"
 
-weak void 
+#ifdef __SUNPRO_C
+#pragma weak remove_fs_handlers
+#endif
+
+weak void
 remove_fs_handlers(FontPathElementPtr fpe,
                    BlockHandlerProcPtr blockHandler,
                    Bool all)

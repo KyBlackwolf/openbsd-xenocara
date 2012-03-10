@@ -1,5 +1,3 @@
-/* $Xorg: AuFileName.c,v 1.5 2001/02/09 02:03:42 xorgcvs Exp $ */
-
 /*
 
 Copyright 1988, 1998  The Open Group
@@ -25,7 +23,6 @@ used in advertising or otherwise to promote the sale, use or other dealings
 in this Software without prior written authorization from The Open Group.
 
 */
-/* $XFree86: xc/lib/Xau/AuFileName.c,v 3.6 2001/07/25 15:04:48 dawes Exp $ */
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -35,9 +32,9 @@ in this Software without prior written authorization from The Open Group.
 #include <stdlib.h>
 
 char *
-XauFileName ()
+XauFileName (void)
 {
-    char *slashDotXauthority = "/.Xauthority";
+    const char *slashDotXauthority = "/.Xauthority";
     char    *name;
     static char	*buf;
     static int	bsize;
@@ -58,7 +55,7 @@ XauFileName ()
 	}
 	if (!name)
 #endif
-	return 0;
+	return NULL;
     }
     size = strlen (name) + strlen(&slashDotXauthority[1]) + 2;
     if (size > bsize) {
@@ -66,7 +63,7 @@ XauFileName ()
 	    free (buf);
 	buf = malloc ((unsigned) size);
 	if (!buf)
-	    return 0;
+	    return NULL;
 	bsize = size;
     }
     strcpy (buf, name);

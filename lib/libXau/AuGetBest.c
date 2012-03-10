@@ -1,5 +1,3 @@
-/* $Xorg: AuGetBest.c,v 1.4 2001/02/09 02:03:42 xorgcvs Exp $ */
-
 /*
 
 Copyright 1988, 1998  The Open Group
@@ -25,7 +23,6 @@ used in advertising or otherwise to promote the sale, use or other dealings
 in this Software without prior written authorization from The Open Group.
 
 */
-/* $XFree86: xc/lib/Xau/AuGetBest.c,v 1.7 2001/12/14 19:54:36 dawes Exp $ */
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -83,12 +80,12 @@ XauGetBestAuthByAddr (
 
     auth_name = XauFileName ();
     if (!auth_name)
-	return 0;
+	return NULL;
     if (access (auth_name, R_OK) != 0)		/* checks REAL id */
-	return 0;
+	return NULL;
     auth_file = fopen (auth_name, "rb");
     if (!auth_file)
-	return 0;
+	return NULL;
 
 #ifdef hpux
     if (family == FamilyLocal) {
@@ -110,7 +107,7 @@ XauGetBestAuthByAddr (
     }
 #endif /* hpux */
 
-    best = 0;
+    best = NULL;
     best_type = types_length;
     for (;;) {
 	entry = XauReadAuth (auth_file);

@@ -1,4 +1,3 @@
-/* $Xorg: xmodmap.c,v 1.4 2001/02/09 02:05:56 xorgcvs Exp $ */
 /*
 
 Copyright 1988, 1998  The Open Group
@@ -26,22 +25,23 @@ other dealings in this Software without prior written authorization
 from The Open Group.
 
 */
-/* $XFree86: xc/programs/xmodmap/xmodmap.c,v 1.8tsi Exp $ */
 
 #include <X11/Xos.h>
 #include <X11/Xlib.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <stdarg.h>
 #include "xmodmap.h"
 
-char *ProgramName;
+const char *ProgramName;
 Display *dpy = NULL;
 int min_keycode, max_keycode;
 Bool verbose = False;
 Bool dontExecute = False;
 
-static void 
+void
+_X_NORETURN
 Exit(int status)
 {
     if (dpy) {
@@ -51,77 +51,107 @@ Exit(int status)
     exit (status);
 }
 
-void *
-chk_malloc(size_t n_bytes)
+static void _X_NORETURN
+FatalError(const char *message)
 {
-    void *buf = malloc(n_bytes);
-    if (!buf) {
-	fprintf(stderr, "%s: Could not allocate %d bytes\n", ProgramName, (int)n_bytes);
-	Exit(-1);
-    }
-    return buf;
+    fprintf(stderr, "%s: %s\n", ProgramName, message);
+    Exit(-1);
 }
 
-static char *help_message[] = {
-"\nwhere options include:",
-"    -display host:dpy            X server to use",
-"    -verbose, -quiet             turn logging on or off",
-"    -n                           don't execute changes, just show like make",
-"    -e expression                execute string",
-"    -pm                          print modifier map",
-"    -pk                          print keymap table",
-"    -pke                         print keymap table as expressions",
-"    -pp                          print pointer map",
-"    -grammar                     print out short help on allowable input",
-"    -                            read standard input",
-"",
-NULL};
+#ifndef HAVE_ASPRINTF
+/* sprintf variant found in newer libc's which allocates string to print to */
+static int _X_ATTRIBUTE_PRINTF(2,3)
+asprintf(char ** ret, const char *format, ...)
+{
+    char buf[256];
+    int len;
+    va_list ap;
+
+    va_start(ap, format);
+    len = vsnprintf(buf, sizeof(buf), format, ap);
+    va_end(ap);
+
+    if (len < 0)
+	return -1;
+
+    if (len < sizeof(buf))
+    {
+	*ret = strdup(buf);
+    }
+    else
+    {
+	*ret = malloc(len + 1); /* snprintf doesn't count trailing '\0' */
+	if (*ret != NULL)
+	{
+	    va_start(ap, format);
+	    len = vsnprintf(*ret, len + 1, format, ap);
+	    va_end(ap);
+	    if (len < 0) {
+		free(*ret);
+		*ret = NULL;
+	    }
+	}
+    }
+
+    if (*ret == NULL)
+	return -1;
+
+    return len;
+}
+#endif /* HAVE_ASPRINTF */
+
+static const char help_message[] = 
+"\nwhere options include:\n"
+"    -display host:dpy            X server to use\n"
+"    -verbose, -quiet             turn logging on or off\n"
+"    -n                           don't execute changes, just show like make\n"
+"    -e expression                execute string\n"
+"    -pm                          print modifier map\n"
+"    -pk                          print keymap table\n"
+"    -pke                         print keymap table as expressions\n"
+"    -pp                          print pointer map\n"
+"    -grammar                     print out short help on allowable input\n"
+"    -                            read standard input\n"
+"\n";
 
 
 static void 
+_X_NORETURN
 usage(void)
 {
-    char **cpp;
-
     fprintf (stderr, "usage:  %s [-options ...] [filename]\n", ProgramName);
-    for (cpp = help_message; *cpp; cpp++) {
-	fprintf (stderr, "%s\n", *cpp);
-    }
+    fprintf (stderr, "%s\n", help_message);
     Exit (1);
 }
 
-static char *grammar_message[] = {
-"    pointer = default              reset pointer buttons to default",
-"    pointer = NUMBER ...           set pointer button codes",
-"    keycode NUMBER = [KEYSYM ...]  map keycode to given keysyms",
-"    keysym KEYSYM = [KEYSYM ...]   look up keysym and do a keycode operation",
-"    clear MODIFIER                 remove all keys for this modifier",
-"    add MODIFIER = KEYSYM ...      add the keysyms to the modifier",
-"    remove MODIFIER = KEYSYM ...   remove the keysyms from the modifier",
-"",
-"where NUMBER is a decimal, octal, or hex constant; KEYSYM is a valid",
-"Key Symbol name; and MODIFIER is one of the eight modifier names:  Shift,",
-"Lock, Control, Mod1, Mod2, Mod3, Mod4, or Mod5.  Lines beginning with",
-"an exclamation mark (!) are taken as comments.  Case is significant except",
-"for MODIFIER names.",
-"",
-"Keysyms on the left hand side of the = sign are looked up before any changes",
-"are made; keysyms on the right are looked up after all of those on the left",
-"have been resolved.  This makes it possible to swap modifier keys.",
-"",
-NULL };
+static const char grammar_message[] = 
+"    pointer = default              reset pointer buttons to default\n"
+"    pointer = NUMBER ...           set pointer button codes\n"
+"    keycode NUMBER = [KEYSYM ...]  map keycode to given keysyms\n"
+"    keysym KEYSYM = [KEYSYM ...]   look up keysym and do a keycode operation\n"
+"    clear MODIFIER                 remove all keys for this modifier\n"
+"    add MODIFIER = KEYSYM ...      add the keysyms to the modifier\n"
+"    remove MODIFIER = KEYSYM ...   remove the keysyms from the modifier\n"
+"\n"
+"where NUMBER is a decimal, octal, or hex constant; KEYSYM is a valid\n"
+"Key Symbol name; and MODIFIER is one of the eight modifier names:  Shift,\n"
+"Lock, Control, Mod1, Mod2, Mod3, Mod4, or Mod5.  Lines beginning with\n"
+"an exclamation mark (!) are taken as comments.  Case is significant except\n"
+"for MODIFIER names.\n"
+"\n"
+"Keysyms on the left hand side of the = sign are looked up before any changes\n"
+"are made; keysyms on the right are looked up after all of those on the left\n"
+"have been resolved.  This makes it possible to swap modifier keys.\n"
+"\n";
 
 
 static void 
+_X_NORETURN
 grammar_usage(void)
 {
-    char **cpp;
-
     fprintf (stderr, "%s accepts the following input expressions:\n\n",
 	     ProgramName);
-    for (cpp = grammar_message; *cpp; cpp++) {
-	fprintf (stderr, "%s\n", *cpp);
-    }
+    fprintf (stderr, "%s\n", grammar_message);
     Exit (0);
 }
 
@@ -168,7 +198,6 @@ main(int argc, char *argv[])
      * the display being open.
      */
 
-    status = 0;
     for (i = 1; i < argc; i++) {
 	char *arg = argv[i];
 
@@ -257,11 +286,11 @@ main(int argc, char *argv[])
 		  char *cmd;
 		  didAnything = True;
 		  if (++i >= argc) usage ();
-		  cmd = chk_malloc (strlen ("remove control = ") + strlen (argv[i]) + 1);
-		  (void) sprintf (cmd, "remove %s = %s",
+		  if (asprintf (&cmd, "remove %s = %s",
 				  ((arg[1] == 's') ? "shift" :
 				   ((arg[1] == 'l') ? "lock" :
-				    "control")), argv[i]);
+				    "control")), argv[i]) == -1)
+		      FatalError("Could not allocate memory for remove cmd");
 		  process_line (cmd);
 		  continue;
 	      }
@@ -279,8 +308,8 @@ main(int argc, char *argv[])
 		  char *cmd;
 		  didAnything = True;
 		  if (++i >= argc) usage ();
-		  cmd = chk_malloc (strlen ("add modX = ") + strlen (argv[i]) + 1);
-		  (void) sprintf (cmd, "add mod%c = %s", arg[1], argv[i]);
+		  if (asprintf (&cmd, "add mod%c = %s", arg[1], argv[i]) == -1)
+		      FatalError("Could not allocate memory for add cmd");
 		  process_line (cmd);
 		  continue;
 	      }
@@ -295,11 +324,11 @@ main(int argc, char *argv[])
 		  char *cmd;
 		  didAnything = True;
 		  if (++i >= argc) usage ();
-		  cmd = chk_malloc (strlen ("add control = ") + strlen (argv[i]) + 1);
-		  (void) sprintf (cmd, "add %s = %s",
+		  if (asprintf (&cmd, "add %s = %s",
 				  ((arg[1] == 's') ? "shift" :
 				   ((arg[1] == 'l') ? "lock" :
-				    "control")), argv[i]);
+				    "control")), argv[i]) == -1)
+		      FatalError("Could not allocate memory for remove cmd");
 		  process_line (cmd);
 		  continue;
 	      }

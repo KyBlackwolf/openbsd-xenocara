@@ -1,4 +1,3 @@
-/* $XFree86$ */
 /*
 
 Copyright 1987, 1998  The Open Group
@@ -46,8 +45,8 @@ typedef struct {
 } CanvasClassPart;
 
 typedef struct _CanvasClassRec {
-    CoreClassPart	core_class;
-    CanvasClassPart	canvas_class;
+    CoreClassPart core_class;
+    CanvasClassPart canvas_class;
 } CanvasClassRec;
 
 extern CanvasClassRec canvasClassRec;
@@ -59,8 +58,8 @@ typedef struct {
 } CanvasPart;
 
 typedef struct _CanvasRec {
-    CorePart	core;
-    CanvasPart	canvas;
+    CorePart core;
+    CanvasPart canvas;
 } CanvasRec;
 
-#endif /* _CanvasP_h */
+#endif                          /* _CanvasP_h */

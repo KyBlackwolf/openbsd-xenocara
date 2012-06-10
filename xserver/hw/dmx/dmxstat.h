@@ -1,4 +1,3 @@
-/* $XFree86$ */
 /*
  * Copyright 2002 Red Hat Inc., Durham, North Carolina.
  *
@@ -44,13 +43,13 @@
 #define DMX_STAT_BIN0    10000  /**< us for bin[0] */
 #define DMX_STAT_BINMULT   100  /**< multiplier for next bin[] */
 
-extern int         dmxStatInterval; /**< Only for dmxstat.c and dmxsync.c */
-extern void        dmxStatActivate(const char *interval, const char *displays);
+extern int dmxStatInterval;         /**< Only for dmxstat.c and dmxsync.c */
+extern void dmxStatActivate(const char *interval, const char *displays);
 extern DMXStatInfo *dmxStatAlloc(void);
-extern void        dmxStatFree(DMXStatInfo *);
-extern void        dmxStatInit(void);
-extern void        dmxStatSync(DMXScreenInfo *dmxScreen,
-                               struct timeval *stop, struct timeval *start,
-                               unsigned long pending);
+extern void dmxStatFree(DMXStatInfo *);
+extern void dmxStatInit(void);
+extern void dmxStatSync(DMXScreenInfo * dmxScreen,
+                        struct timeval *stop, struct timeval *start,
+                        unsigned long pending);
 
 #endif

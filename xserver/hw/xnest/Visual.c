@@ -11,7 +11,6 @@ the suitability of this software for any purpose.  It is provided "as
 is" without express or implied warranty.
 
 */
-/* $XFree86$ */
 
 #ifdef HAVE_XNEST_CONFIG_H
 #include <xnest-config.h>
@@ -31,41 +30,41 @@ is" without express or implied warranty.
 Visual *
 xnestVisual(VisualPtr pVisual)
 {
-  int i;
+    int i;
 
-  for (i = 0; i < xnestNumVisuals; i++)
-    if (pVisual->class == xnestVisuals[i].class &&
-	pVisual->bitsPerRGBValue == xnestVisuals[i].bits_per_rgb &&
-	pVisual->ColormapEntries == xnestVisuals[i].colormap_size &&
-	pVisual->nplanes == xnestVisuals[i].depth &&
-	pVisual->redMask == xnestVisuals[i].red_mask &&
-	pVisual->greenMask == xnestVisuals[i].green_mask &&
-	pVisual->blueMask == xnestVisuals[i].blue_mask)
-      return xnestVisuals[i].visual;
+    for (i = 0; i < xnestNumVisuals; i++)
+        if (pVisual->class == xnestVisuals[i].class &&
+            pVisual->bitsPerRGBValue == xnestVisuals[i].bits_per_rgb &&
+            pVisual->ColormapEntries == xnestVisuals[i].colormap_size &&
+            pVisual->nplanes == xnestVisuals[i].depth &&
+            pVisual->redMask == xnestVisuals[i].red_mask &&
+            pVisual->greenMask == xnestVisuals[i].green_mask &&
+            pVisual->blueMask == xnestVisuals[i].blue_mask)
+            return xnestVisuals[i].visual;
 
-  return NULL;
+    return NULL;
 }
 
 Visual *
 xnestVisualFromID(ScreenPtr pScreen, VisualID visual)
 {
-  int i;
-  
-  for (i = 0; i < pScreen->numVisuals; i++)
-    if (pScreen->visuals[i].vid == visual)
-      return xnestVisual(&pScreen->visuals[i]);
+    int i;
 
-  return NULL;
+    for (i = 0; i < pScreen->numVisuals; i++)
+        if (pScreen->visuals[i].vid == visual)
+            return xnestVisual(&pScreen->visuals[i]);
+
+    return NULL;
 }
 
 Colormap
-xnestDefaultVisualColormap(Visual *visual)
+xnestDefaultVisualColormap(Visual * visual)
 {
-  int i;
-  
-  for (i = 0; i < xnestNumVisuals; i++)
-    if (xnestVisuals[i].visual == visual)
-      return xnestDefaultColormaps[i];
-  
-  return None;
+    int i;
+
+    for (i = 0; i < xnestNumVisuals; i++)
+        if (xnestVisuals[i].visual == visual)
+            return xnestDefaultColormaps[i];
+
+    return None;
 }

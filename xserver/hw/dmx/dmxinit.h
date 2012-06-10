@@ -1,4 +1,3 @@
-/* $XFree86$ */
 /*
  * Copyright 2004 Red Hat Inc., Raleigh, North Carolina.
  *
@@ -40,12 +39,12 @@
 
 #include "scrnintstr.h"
 
-extern Bool dmxOpenDisplay(DMXScreenInfo *dmxScreen);
-extern void dmxSetErrorHandler(DMXScreenInfo *dmxScreen);
-extern void dmxCheckForWM(DMXScreenInfo *dmxScreen);
-extern void dmxGetScreenAttribs(DMXScreenInfo *dmxScreen);
-extern Bool dmxGetVisualInfo(DMXScreenInfo *dmxScreen);
-extern void dmxGetColormaps(DMXScreenInfo *dmxScreen);
-extern void dmxGetPixmapFormats(DMXScreenInfo *dmxScreen);
+extern Bool dmxOpenDisplay(DMXScreenInfo * dmxScreen);
+extern void dmxSetErrorHandler(DMXScreenInfo * dmxScreen);
+extern void dmxCheckForWM(DMXScreenInfo * dmxScreen);
+extern void dmxGetScreenAttribs(DMXScreenInfo * dmxScreen);
+extern Bool dmxGetVisualInfo(DMXScreenInfo * dmxScreen);
+extern void dmxGetColormaps(DMXScreenInfo * dmxScreen);
+extern void dmxGetPixmapFormats(DMXScreenInfo * dmxScreen);
 
-#endif /* DMXINIT_H */
+#endif                          /* DMXINIT_H */

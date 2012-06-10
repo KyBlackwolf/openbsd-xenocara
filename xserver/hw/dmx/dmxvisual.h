@@ -1,4 +1,3 @@
-/* $XFree86$ */
 /*
  * Copyright 2002 Red Hat Inc., Durham, North Carolina.
  *
@@ -40,9 +39,9 @@
 
 #include "scrnintstr.h"
 
-extern Visual   *dmxLookupVisual(ScreenPtr pScreen, VisualPtr pVisual);
-extern Visual   *dmxLookupVisualFromID(ScreenPtr pScreen, VisualID vid);
-extern Colormap  dmxColormapFromDefaultVisual(ScreenPtr pScreen,
-					      Visual *visual);
+extern Visual *dmxLookupVisual(ScreenPtr pScreen, VisualPtr pVisual);
+extern Visual *dmxLookupVisualFromID(ScreenPtr pScreen, VisualID vid);
+extern Colormap dmxColormapFromDefaultVisual(ScreenPtr pScreen,
+                                             Visual * visual);
 
-#endif /* DMXVISUAL_H */
+#endif                          /* DMXVISUAL_H */

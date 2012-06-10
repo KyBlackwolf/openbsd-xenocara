@@ -1,4 +1,3 @@
-/* $XFree86$ */
 /*
  * Copyright 2002,2003 Red Hat Inc., Durham, North Carolina.
  *
@@ -37,11 +36,10 @@
 
 #ifndef _DMXPROP_H_
 #define _DMXPROP_H_
-extern int  dmxPropertyDisplay(DMXScreenInfo *dmxScreen);
-extern void dmxPropertyWindow(DMXScreenInfo *dmxScreen);
-extern void *dmxPropertyIterate(DMXScreenInfo *start,
-                                void *(*f)(DMXScreenInfo *dmxScreen,
-                                           void *closure),
-                                void *closure);
-extern int dmxPropertySameDisplay(DMXScreenInfo *dmxScreen, const char *name);
+extern int dmxPropertyDisplay(DMXScreenInfo * dmxScreen);
+extern void dmxPropertyWindow(DMXScreenInfo * dmxScreen);
+extern void *dmxPropertyIterate(DMXScreenInfo * start,
+                                void *(*f) (DMXScreenInfo * dmxScreen,
+                                            void *closure), void *closure);
+extern int dmxPropertySameDisplay(DMXScreenInfo * dmxScreen, const char *name);
 #endif

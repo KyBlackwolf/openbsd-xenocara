@@ -11,7 +11,6 @@ the suitability of this software for any purpose.  It is provided "as
 is" without express or implied warranty.
 
 */
-/* $XFree86$ */
 
 #ifndef XNESTPOINTER_H
 #define XNESTPOINTER_H
@@ -24,7 +23,7 @@ is" without express or implied warranty.
 
 extern DeviceIntPtr xnestPointerDevice;
 
-void xnestChangePointerControl(DeviceIntPtr pDev, PtrCtrl *ctrl);
+void xnestChangePointerControl(DeviceIntPtr pDev, PtrCtrl * ctrl);
 int xnestPointerProc(DeviceIntPtr pDev, int onoff);
 
-#endif /* XNESTPOINTER_H */
+#endif                          /* XNESTPOINTER_H */

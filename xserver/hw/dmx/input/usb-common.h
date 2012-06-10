@@ -1,4 +1,3 @@
-/* $XFree86$ */
 /*
  * Copyright 2002 Red Hat Inc., Durham, North Carolina.
  *
@@ -45,12 +44,11 @@ typedef enum {
 } usbType;
 
 extern pointer usbCreatePrivate(DeviceIntPtr pDevice);
-extern void    usbDestroyPrivate(pointer priv);
-extern void    usbRead(DevicePtr pDev,
-                       dmxMotionProcPtr motion,
-                       dmxEnqueueProcPtr enqueue,
-                       int minButton,
-                       DMXBlockType block);
-extern void    usbInit(DevicePtr pDev, usbType type);
-extern void    usbOff(DevicePtr pDev);
+extern void usbDestroyPrivate(pointer priv);
+extern void usbRead(DevicePtr pDev,
+                    dmxMotionProcPtr motion,
+                    dmxEnqueueProcPtr enqueue,
+                    int minButton, DMXBlockType block);
+extern void usbInit(DevicePtr pDev, usbType type);
+extern void usbOff(DevicePtr pDev);
 #endif

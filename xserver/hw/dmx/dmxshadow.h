@@ -1,4 +1,3 @@
-/* $XFree86$ */
 /*
  * Copyright 2001 Red Hat Inc., Durham, North Carolina.
  *
@@ -44,4 +43,4 @@
 
 extern void dmxShadowUpdateProc(ScreenPtr pScreen, shadowBufPtr pBuf);
 
-#endif /* DMXSHADOW_H */
+#endif                          /* DMXSHADOW_H */

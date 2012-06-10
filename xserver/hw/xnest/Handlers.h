@@ -11,13 +11,12 @@ the suitability of this software for any purpose.  It is provided "as
 is" without express or implied warranty.
 
 */
-/* $XFree86$ */
 
 #ifndef XNESTHANDLERS_H
 #define XNESTHANDLERS_H
 
 void xnestBlockHandler(pointer blockData, OSTimePtr pTimeout,
-		       pointer pReadMask);
+                       pointer pReadMask);
 void xnestWakeupHandler(pointer blockData, int result, pointer pReadMask);
 
-#endif /* XNESTHANDLERS_H */
+#endif                          /* XNESTHANDLERS_H */

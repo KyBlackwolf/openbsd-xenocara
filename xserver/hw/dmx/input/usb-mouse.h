@@ -1,4 +1,3 @@
-/* $XFree86$ */
 /*
  * Copyright 2002 Red Hat Inc., Durham, North Carolina.
  *
@@ -37,13 +36,12 @@
 
 #ifndef _USB_MOU_H_
 #define _USB_MOU_H_
-extern void    mouUSBRead(DevicePtr pDev,
-                          dmxMotionProcPtr motion,
-                          dmxEnqueueProcPtr enqueue,
-                          dmxCheckSpecialProcPtr checkspecial,
-                          DMXBlockType block);
-extern void    mouUSBInit(DevicePtr pDev);
-extern void    mouUSBGetInfo(DevicePtr pDev, DMXLocalInitInfoPtr info);
-extern int     mouUSBOn(DevicePtr pDev);
-extern void    mouUSBCtrl(DevicePtr pDev, PtrCtrl *ctrl);
+extern void mouUSBRead(DevicePtr pDev,
+                       dmxMotionProcPtr motion,
+                       dmxEnqueueProcPtr enqueue,
+                       dmxCheckSpecialProcPtr checkspecial, DMXBlockType block);
+extern void mouUSBInit(DevicePtr pDev);
+extern void mouUSBGetInfo(DevicePtr pDev, DMXLocalInitInfoPtr info);
+extern int mouUSBOn(DevicePtr pDev);
+extern void mouUSBCtrl(DevicePtr pDev, PtrCtrl * ctrl);
 #endif

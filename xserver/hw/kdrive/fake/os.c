@@ -1,6 +1,4 @@
 /*
- * $Id: os.c,v 1.1 2006/11/26 18:21:49 matthieu Exp $
- *
  * Copyright © 2004 Keith Packard
  *
  * Permission to use, copy, modify, distribute, and sell this software and its
@@ -28,33 +26,33 @@
 #include "fake.h"
 
 static int
-FakeInit (void)
+FakeInit(void)
 {
     return 1;
 }
 
 static void
-FakeEnable (void)
+FakeEnable(void)
 {
 }
 
 static Bool
-FakeSpecialKey (KeySym sym)
+FakeSpecialKey(KeySym sym)
 {
     return FALSE;
 }
 
 static void
-FakeDisable (void)
+FakeDisable(void)
 {
 }
 
 static void
-FakeFini (void)
+FakeFini(void)
 {
 }
 
-KdOsFuncs   FakeOsFuncs = {
+KdOsFuncs FakeOsFuncs = {
     FakeInit,
     FakeEnable,
     FakeSpecialKey,
@@ -62,4 +60,3 @@ KdOsFuncs   FakeOsFuncs = {
     FakeFini,
     0
 };
-

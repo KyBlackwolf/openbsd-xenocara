@@ -11,7 +11,6 @@ the suitability of this software for any purpose.  It is provided "as
 is" without express or implied warranty.
 
 */
-/* $XFree86$ */
 
 #ifndef XNESTEVENTS_H
 #define XNESTEVENTS_H
@@ -27,4 +26,4 @@ void xnestCollectExposures(void);
 void xnestCollectEvents(void);
 void xnestQueueKeyEvent(int type, unsigned int keycode);
 
-#endif /* XNESTEVENTS_H */
+#endif                          /* XNESTEVENTS_H */

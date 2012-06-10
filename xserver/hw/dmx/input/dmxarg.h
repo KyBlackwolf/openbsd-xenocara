@@ -1,4 +1,3 @@
-/* $XFree86$ */
 /*
  * Copyright 2002 Red Hat Inc., Durham, North Carolina.
  *
@@ -40,11 +39,11 @@
 
 typedef struct _dmxArg *dmxArg;
 
-extern dmxArg     dmxArgCreate(void);
-extern void       dmxArgFree(dmxArg a);
-extern void       dmxArgAdd(dmxArg a, const char *string);
+extern dmxArg dmxArgCreate(void);
+extern void dmxArgFree(dmxArg a);
+extern void dmxArgAdd(dmxArg a, const char *string);
 extern const char *dmxArgV(dmxArg a, int item);
-extern int        dmxArgC(dmxArg a);
-extern dmxArg     dmxArgParse(const char *string);
+extern int dmxArgC(dmxArg a);
+extern dmxArg dmxArgParse(const char *string);
 
 #endif

@@ -1,4 +1,3 @@
-/* $XFree86$ */
 /*
  * Copyright 2003 Red Hat Inc., Durham, North Carolina.
  *
@@ -39,5 +38,5 @@
 extern void dmxMapInsert(DMXLocalInputInfoPtr dmxLocal,
                          int remoteEvent, int serverEvent);
 extern void dmxMapClear(DMXLocalInputInfoPtr dmxLocal);
-extern int  dmxMapLookup(DMXLocalInputInfoPtr dmxLocal, int remoteEvent);
+extern int dmxMapLookup(DMXLocalInputInfoPtr dmxLocal, int remoteEvent);
 #endif

@@ -11,7 +11,6 @@ the suitability of this software for any purpose.  It is provided "as
 is" without express or implied warranty.
 
 */
-/* $XFree86$ */
 
 #ifndef XNESTKEYBOARD_H
 #define XNESTKEYBOARD_H
@@ -22,8 +21,8 @@ is" without express or implied warranty.
 extern DeviceIntPtr xnestKeyboardDevice;
 
 void xnestBell(int volume, DeviceIntPtr pDev, pointer ctrl, int cls);
-void xnestChangeKeyboardControl(DeviceIntPtr pDev, KeybdCtrl *ctrl);
+void xnestChangeKeyboardControl(DeviceIntPtr pDev, KeybdCtrl * ctrl);
 int xnestKeyboardProc(DeviceIntPtr pDev, int onoff);
 void xnestUpdateModifierState(unsigned int state);
 
-#endif /* XNESTKEYBOARD_H */
+#endif                          /* XNESTKEYBOARD_H */

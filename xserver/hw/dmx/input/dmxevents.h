@@ -1,4 +1,3 @@
-/* $XFree86$ */
 /*
  * Copyright 2001 Red Hat Inc., Durham, North Carolina.
  *
@@ -41,7 +40,7 @@
 extern void dmxMotion(DevicePtr pDev, int *v, int firstAxis, int axesCount,
                       DMXMotionType type, DMXBlockType block);
 extern void dmxEnqueue(DevicePtr pDev, int type, int detail, KeySym keySym,
-                       XEvent *e, DMXBlockType block);
-extern int  dmxCheckSpecialKeys(DevicePtr pDev, KeySym keySym);
+                       XEvent * e, DMXBlockType block);
+extern int dmxCheckSpecialKeys(DevicePtr pDev, KeySym keySym);
 extern void dmxInvalidateGlobalPosition(void);
 #endif

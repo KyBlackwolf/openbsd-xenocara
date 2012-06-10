@@ -11,7 +11,6 @@ the suitability of this software for any purpose.  It is provided "as
 is" without express or implied warranty.
 
 */
-/* $XFree86$ */
 
 #ifndef XNESTSCREEN_H
 #define XNESTSCREEN_H
@@ -23,4 +22,4 @@ ScreenPtr xnestScreen(Window window);
 Bool xnestOpenScreen(int index, ScreenPtr pScreen, int argc, char *argv[]);
 Bool xnestCloseScreen(int index, ScreenPtr pScreen);
 
-#endif /* XNESTSCREEN_H */
+#endif                          /* XNESTSCREEN_H */

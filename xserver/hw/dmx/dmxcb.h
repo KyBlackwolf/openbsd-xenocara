@@ -1,4 +1,3 @@
-/* $XFree86$ */
 /*
  * Copyright 2001,2002 Red Hat Inc., Durham, North Carolina.
  *
@@ -39,7 +38,7 @@
 #ifndef _DMXCB_H_
 #define _DMXCB_H_
 /** The cursor position, in global coordinates. */
-extern int  dmxGlobalWidth, dmxGlobalHeight;
+extern int dmxGlobalWidth, dmxGlobalHeight;
 
 /** #dmxComputeWidthHeight can either recompute the global bounding box
  * or not. */

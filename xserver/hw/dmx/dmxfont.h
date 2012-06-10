@@ -1,4 +1,3 @@
-/* $XFree86$ */
 /*
  * Copyright 2001-2004 Red Hat Inc., Durham, North Carolina.
  *
@@ -42,7 +41,7 @@
 
 /** Font private area. */
 typedef struct _dmxFontPriv {
-    int          refcnt;
+    int refcnt;
     XFontStruct **font;
 } dmxFontPrivRec, *dmxFontPrivPtr;
 
@@ -57,4 +56,4 @@ extern Bool dmxBEFreeFont(ScreenPtr pScreen, FontPtr pFont);
 
 extern int dmxFontPrivateIndex;
 
-#endif /* DMXFONT_H */
+#endif                          /* DMXFONT_H */

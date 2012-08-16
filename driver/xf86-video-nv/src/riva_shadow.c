@@ -2,7 +2,6 @@
    Copyright (c) 1999,  The XFree86 Project Inc. 
    Written by Mark Vojkovich <markv@valinux.com>
 */
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/nv/riva_shadow.c $ */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -43,9 +42,9 @@ RivaRefreshArea(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 } 
 
 void
-RivaPointerMoved(int index, int x, int y)
+RivaPointerMoved(SCRN_ARG_TYPE arg, int x, int y)
 {
-    ScrnInfoPtr pScrn = xf86Screens[index];
+    SCRN_INFO_PTR(arg);
     RivaPtr pRiva = RivaPTR(pScrn);
     int newX, newY;
 
@@ -57,7 +56,7 @@ RivaPointerMoved(int index, int x, int y)
 	newY = pScrn->pScreen->width - x - 1;
     }
 
-    (*pRiva->PointerMoved)(index, newX, newY);
+    (*pRiva->PointerMoved)(arg, newX, newY);
 }
 
 void
@@ -193,6 +192,3 @@ RivaRefreshArea32(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 	pbox++;
     }
 }
-
-
-

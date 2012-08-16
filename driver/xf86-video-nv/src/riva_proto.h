@@ -1,11 +1,9 @@
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/nv/riva_proto.h $ */
-
 #ifndef __RIVA_PROTO_H__
 #define __RIVA_PROTO_H__
 
 /* in riva_driver.c */
-Bool    RivaSwitchMode(int scrnIndex, DisplayModePtr mode, int flags);
-void    RivaAdjustFrame(int scrnIndex, int x, int y, int flags);
+Bool    RivaSwitchMode(SWITCH_MODE_ARGS_DECL);
+void    RivaAdjustFrame(ADJUST_FRAME_ARGS_DECL);
 Bool    RivaI2CInit(ScrnInfoPtr pScrn);
 const   OptionInfoRec * RivaAvailableOptions(int chipid, int busid);
 Bool    RivaGetScrnInfoRec(PciChipsets *chips, int chip);
@@ -38,4 +36,3 @@ Bool    RivaDGAInit(ScreenPtr pScreen);
 
 
 #endif /* __RIVA_PROTO_H__ */
-

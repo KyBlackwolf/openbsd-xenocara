@@ -1,10 +1,8 @@
-/* $Id: mmx.h,v 1.1 2006/11/25 18:54:18 matthieu Exp $ */
-
 /*
  * Mesa 3-D graphics library
- * Version:  3.5
+ * Version:  6.5.2
  *
- * Copyright (C) 1999-2001  Brian Paul   All Rights Reserved.
+ * Copyright (C) 1999-2006  Brian Paul   All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -28,24 +26,34 @@
 #ifndef ASM_MMX_H
 #define ASM_MMX_H
 
-extern void _ASMAPI
-_mesa_mmx_blend_transparency( GLcontext *ctx, GLuint n, const GLubyte mask[],
-                              GLubyte rgba[][4], const GLubyte dest[][4] );
+#include "main/compiler.h"
+#include "main/glheader.h"
+
+struct gl_context;
 
 extern void _ASMAPI
-_mesa_mmx_blend_add( GLcontext *ctx, GLuint n, const GLubyte mask[],
-                     GLubyte rgba[][4], const GLubyte dest[][4] );
+_mesa_mmx_blend_transparency( struct gl_context *ctx, GLuint n, const GLubyte mask[],
+                              GLvoid *rgba, const GLvoid *dest,
+                              GLenum chanType );
 
 extern void _ASMAPI
-_mesa_mmx_blend_min( GLcontext *ctx, GLuint n, const GLubyte mask[],
-                     GLubyte rgba[][4], const GLubyte dest[][4] );
+_mesa_mmx_blend_add( struct gl_context *ctx, GLuint n, const GLubyte mask[],
+                     GLvoid *rgba, const GLvoid *dest,
+                     GLenum chanType );
 
 extern void _ASMAPI
-_mesa_mmx_blend_max( GLcontext *ctx, GLuint n, const GLubyte mask[],
-                     GLubyte rgba[][4], const GLubyte dest[][4] );
+_mesa_mmx_blend_min( struct gl_context *ctx, GLuint n, const GLubyte mask[],
+                     GLvoid *rgba, const GLvoid *dest,
+                     GLenum chanType );
 
 extern void _ASMAPI
-_mesa_mmx_blend_modulate( GLcontext *ctx, GLuint n, const GLubyte mask[],
-                          GLubyte rgba[][4], const GLubyte dest[][4] );
+_mesa_mmx_blend_max( struct gl_context *ctx, GLuint n, const GLubyte mask[],
+                     GLvoid *rgba, const GLvoid *dest,
+                     GLenum chanType );
+
+extern void _ASMAPI
+_mesa_mmx_blend_modulate( struct gl_context *ctx, GLuint n, const GLubyte mask[],
+                          GLvoid *rgba, const GLvoid *dest,
+                          GLenum chanType );
 
 #endif

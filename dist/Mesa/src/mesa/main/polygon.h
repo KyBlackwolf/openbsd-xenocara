@@ -5,9 +5,9 @@
 
 /*
  * Mesa 3-D graphics library
- * Version:  6.3
+ * Version:  6.5.1
  *
- * Copyright (C) 1999-2004  Brian Paul   All Rights Reserved.
+ * Copyright (C) 1999-2006  Brian Paul   All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -32,11 +32,15 @@
 #define POLYGON_H
 
 
-#include "mtypes.h"
+#include "glheader.h"
 
+struct gl_context;
+
+extern void GLAPIENTRY
+_mesa_GetnPolygonStippleARB( GLsizei bufSize, GLubyte *dest );
 
 extern void
-_mesa_polygon_stipple(GLcontext *ctx, const GLubyte *pattern);
+_mesa_polygon_stipple(struct gl_context *ctx, const GLubyte *pattern);
 
 
 extern void GLAPIENTRY
@@ -60,10 +64,7 @@ _mesa_PolygonStipple( const GLubyte *mask );
 extern void GLAPIENTRY
 _mesa_GetPolygonStipple( GLubyte *mask );
 
-extern void  
-_mesa_update_polygon( GLcontext *ctx );
-
 extern void 
-_mesa_init_polygon( GLcontext * ctx );
+_mesa_init_polygon( struct gl_context * ctx );
 
 #endif

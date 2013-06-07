@@ -4,7 +4,7 @@
 /*                                                                         */
 /*    FreeType utility file for memory and list management (body).         */
 /*                                                                         */
-/*  Copyright 2002, 2004, 2005, 2006 by                                    */
+/*  Copyright 2002, 2004-2007, 2013 by                                     */
 /*  David Turner, Robert Wilhelm, and Werner Lemberg.                      */
 /*                                                                         */
 /*  This file is part of the FreeType project, and may only be used,       */
@@ -75,12 +75,12 @@
     {
       block = memory->alloc( memory, size );
       if ( block == NULL )
-        error = FT_Err_Out_Of_Memory;
+        error = FT_THROW( Out_Of_Memory );
     }
     else if ( size < 0 )
     {
       /* may help catch/prevent security issues */
-      error = FT_Err_Invalid_Argument;
+      error = FT_THROW( Invalid_Argument );
     }
 
     *p_error = error;
@@ -97,6 +97,7 @@
                   FT_Error  *p_error )
   {
     FT_Error  error = FT_Err_Ok;
+
 
     block = ft_mem_qrealloc( memory, item_size,
                              cur_count, new_count, block, &error );
@@ -120,19 +121,23 @@
     FT_Error  error = FT_Err_Ok;
 
 
-    if ( cur_count < 0 || new_count < 0 || item_size <= 0 )
+    /* Note that we now accept `item_size == 0' as a valid parameter, in
+     * order to cover very weird cases where an ALLOC_MULT macro would be
+     * called.
+     */
+    if ( cur_count < 0 || new_count < 0 || item_size < 0 )
     {
       /* may help catch/prevent nasty security issues */
-      error = FT_Err_Invalid_Argument;
+      error = FT_THROW( Invalid_Argument );
     }
-    else if ( new_count == 0 )
+    else if ( new_count == 0 || item_size == 0 )
     {
       ft_mem_free( memory, block );
       block = NULL;
     }
     else if ( new_count > FT_INT_MAX/item_size )
     {
-      error = FT_Err_Array_Too_Large;
+      error = FT_THROW( Array_Too_Large );
     }
     else if ( cur_count == 0 )
     {
@@ -149,7 +154,7 @@
 
       block2 = memory->realloc( memory, cur_size, new_size, block );
       if ( block2 == NULL )
-        error = FT_Err_Out_Of_Memory;
+        error = FT_THROW( Out_Of_Memory );
       else
         block = block2;
     }
@@ -165,6 +170,54 @@
   {
     if ( P )
       memory->free( memory, (void*)P );
+  }
+
+
+  FT_BASE_DEF( FT_Pointer )
+  ft_mem_dup( FT_Memory    memory,
+              const void*  address,
+              FT_ULong     size,
+              FT_Error    *p_error )
+  {
+    FT_Error    error;
+    FT_Pointer  p = ft_mem_qalloc( memory, size, &error );
+
+
+    if ( !error && address )
+      ft_memcpy( p, address, size );
+
+    *p_error = error;
+    return p;
+  }
+
+
+  FT_BASE_DEF( FT_Pointer )
+  ft_mem_strdup( FT_Memory    memory,
+                 const char*  str,
+                 FT_Error    *p_error )
+  {
+    FT_ULong  len = str ? (FT_ULong)ft_strlen( str ) + 1
+                        : 0;
+
+
+    return ft_mem_dup( memory, str, len, p_error );
+  }
+
+
+  FT_BASE_DEF( FT_Int )
+  ft_mem_strcpyn( char*        dst,
+                  const char*  src,
+                  FT_ULong     size )
+  {
+    while ( size > 1 && *src != 0 )
+    {
+      *dst++ = *src++;
+      size--;
+    }
+
+    *dst = 0;  /* always zero-terminate */
+
+    return *src != 0;
   }
 
 

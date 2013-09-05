@@ -20,6 +20,8 @@
 // OTHER DEALINGS IN THE SOFTWARE.
 //
 
+#include <algorithm>
+
 #include "core/queue.hpp"
 #include "core/event.hpp"
 #include "pipe/p_screen.h"
@@ -27,50 +29,41 @@
 
 using namespace clover;
 
-command_queue::command_queue(clover::context &ctx, clover::device &dev,
-                             cl_command_queue_properties props) :
-   context(ctx), device(dev), props(props) {
+_cl_command_queue::_cl_command_queue(context &ctx, device &dev,
+                                     cl_command_queue_properties props) :
+   ctx(ctx), dev(dev), __props(props) {
    pipe = dev.pipe->context_create(dev.pipe, NULL);
    if (!pipe)
       throw error(CL_INVALID_DEVICE);
 }
 
-command_queue::~command_queue() {
+_cl_command_queue::~_cl_command_queue() {
    pipe->destroy(pipe);
 }
 
 void
-command_queue::flush() {
-   pipe_screen *screen = device().pipe;
+_cl_command_queue::flush() {
+   pipe_screen *screen = dev.pipe;
    pipe_fence_handle *fence = NULL;
 
    if (!queued_events.empty()) {
+      // Find out which events have already been signalled.
+      auto first = queued_events.begin();
+      auto last = std::find_if(queued_events.begin(), queued_events.end(),
+                               [](event_ptr &ev) { return !ev->signalled(); });
+
+      // Flush and fence them.
       pipe->flush(pipe, &fence, 0);
-
-      while (!queued_events.empty() &&
-             queued_events.front()().signalled()) {
-         queued_events.front()().fence(fence);
-         queued_events.pop_front();
-      }
-
+      std::for_each(first, last, [&](event_ptr &ev) { ev->fence(fence); });
       screen->fence_reference(screen, &fence, NULL);
+      queued_events.erase(first, last);
    }
 }
 
-cl_command_queue_properties
-command_queue::properties() const {
-   return props;
-}
-
-bool
-command_queue::profiling_enabled() const {
-   return props & CL_QUEUE_PROFILING_ENABLE;
-}
-
 void
-command_queue::sequence(hard_event &ev) {
+_cl_command_queue::sequence(clover::hard_event *ev) {
    if (!queued_events.empty())
-      queued_events.back()().chain(ev);
+      queued_events.back()->chain(ev);
 
    queued_events.push_back(ev);
 }

@@ -58,13 +58,17 @@ GL_PATCH = 0
 
 lib@GL_LIB@_la_LIBADD = \
 	$(top_builddir)/src/mesa/libmesa.la \
-	$(top_builddir)/src/mapi/glapi/libglapi.la \
+	$(top_builddir)/src/mapi/glapi/libglapi.la
+lib@GL_LIB@_la_LDFLAGS = \
+	-version-number $(GL_MAJOR):$(GL_MINOR):$(GL_PATCH) \
+	-no-undefined \
 	$(GL_LIB_DEPS)
 
-lib@GL_LIB@_la_LDFLAGS = \
-	-no-undefined \
-	-version-number $(GL_MAJOR):$(GL_MINOR):$(GL_PATCH) \
-	$(GC_SECTIONS) \
-	$(LD_NO_UNDEFINED)
-
-include $(top_srcdir)/install-lib-links.mk
+if BUILD_SHARED
+# Provide compatibility with scripts for the old Mesa build system for
+# a while by putting a link to the driver into /lib of the build tree.
+all-local: lib@GL_LIB@.la
+	$(MKDIR_P) $(top_builddir)/$(LIB_DIR);
+	ln -f .libs/lib@GL_LIB@.so.$(GL_MAJOR).$(GL_MINOR).$(GL_PATCH) $(top_builddir)/$(LIB_DIR)/lib@GL_LIB@.so.$(GL_MAJOR)
+	ln -sf lib@GL_LIB@.so.$(GL_MAJOR) $(top_builddir)/$(LIB_DIR)/lib@GL_LIB@.so
+endif

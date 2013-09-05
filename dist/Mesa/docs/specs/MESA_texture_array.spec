@@ -16,7 +16,7 @@ IP Status
 
 Status
 
-    DEPRECATED - Support removed in Mesa 10.1.
+    Shipping in Mesa 7.1
 
 Version
 

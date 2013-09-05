@@ -1,6 +1,6 @@
 /**************************************************************************
  *
- * Copyright 2003 VMware, Inc.
+ * Copyright 2003 Tungsten Graphics, Inc., Cedar Park, Texas.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -18,7 +18,7 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
- * IN NO EVENT SHALL VMWARE AND/OR ITS SUPPLIERS BE LIABLE FOR
+ * IN NO EVENT SHALL TUNGSTEN GRAPHICS AND/OR ITS SUPPLIERS BE LIABLE FOR
  * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -34,7 +34,6 @@
 #include "main/bufferobj.h"
 #include "main/readpix.h"
 #include "main/state.h"
-#include "main/glformats.h"
 
 #include "brw_context.h"
 #include "intel_screen.h"
@@ -42,6 +41,7 @@
 #include "intel_buffers.h"
 #include "intel_fbo.h"
 #include "intel_mipmap_tree.h"
+#include "intel_regions.h"
 #include "intel_pixel.h"
 #include "intel_buffer_objects.h"
 
@@ -79,6 +79,7 @@ do_blit_readpixels(struct gl_context * ctx,
    struct intel_buffer_object *dst = intel_buffer_object(pack->BufferObj);
    GLuint dst_offset;
    drm_intel_bo *dst_buffer;
+   bool all;
    GLint dst_x, dst_y;
    GLuint dirty;
 
@@ -88,12 +89,6 @@ do_blit_readpixels(struct gl_context * ctx,
 
    struct gl_renderbuffer *rb = ctx->ReadBuffer->_ColorReadBuffer;
    struct intel_renderbuffer *irb = intel_renderbuffer(rb);
-
-   /* Currently this function only supports reading from color buffers. */
-   if (!_mesa_is_color_format(format))
-      return false;
-
-   assert(irb != NULL);
 
    if (ctx->_ImageTransferState ||
        !_mesa_format_matches_format_and_type(irb->mt->format, format, type,
@@ -112,15 +107,13 @@ do_blit_readpixels(struct gl_context * ctx,
    /* Mesa flips the dst_stride for pack->Invert, but we want our mt to have a
     * normal dst_stride.
     */
-   struct gl_pixelstore_attrib uninverted_pack = *pack;
    if (pack->Invert) {
       dst_stride = -dst_stride;
       dst_flip = true;
-      uninverted_pack.Invert = false;
    }
 
    dst_offset = (GLintptr)pixels;
-   dst_offset += _mesa_image_offset(2, &uninverted_pack, width, height,
+   dst_offset += _mesa_image_offset(2, pack, width, height,
 				    format, type, 0, 0, 0);
 
    if (!_mesa_clip_copytexsubimage(ctx,
@@ -134,8 +127,12 @@ do_blit_readpixels(struct gl_context * ctx,
    intel_prepare_render(brw);
    brw->front_buffer_dirty = dirty;
 
+   all = (width * height * irb->mt->cpp == dst->Base.Size &&
+	  x == 0 && dst_offset == 0);
+
    dst_buffer = intel_bufferobj_buffer(brw, dst,
-				       dst_offset, height * dst_stride);
+				       all ? INTEL_WRITE_FULL :
+				       INTEL_WRITE_PART);
 
    struct intel_mipmap_tree *pbo_mt =
       intel_miptree_create_for_bo(brw,
@@ -143,7 +140,7 @@ do_blit_readpixels(struct gl_context * ctx,
                                   irb->mt->format,
                                   dst_offset,
                                   width, height,
-                                  dst_stride);
+                                  dst_stride, I915_TILING_NONE);
 
    if (!intel_miptree_blit(brw,
                            irb->mt, irb->mt_level, irb->mt_layer,

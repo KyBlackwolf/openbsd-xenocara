@@ -20,13 +20,18 @@
 // OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#ifndef CLOVER_CORE_MODULE_HPP
-#define CLOVER_CORE_MODULE_HPP
+#ifndef __CORE_MODULE_HPP__
+#define __CORE_MODULE_HPP__
 
-#include "util/compat.hpp"
+#include "core/compat.hpp"
 
 namespace clover {
    struct module {
+      class noent_error {
+      public:
+         virtual ~noent_error() {}
+      };
+
       typedef uint32_t resource_id;
       typedef uint32_t size_t;
 
@@ -40,14 +45,14 @@ namespace clover {
          };
 
          section(resource_id id, enum type type, size_t size,
-                 const compat::vector<char> &data) :
+                 const clover::compat::vector<char> &data) :
                  id(id), type(type), size(size), data(data) { }
          section() : id(0), type(text), size(0), data() { }
 
          resource_id id;
          type type;
          size_t size;
-         compat::vector<char> data;
+         clover::compat::vector<char> data;
       };
 
       struct argument {
@@ -92,22 +97,30 @@ namespace clover {
       };
 
       struct symbol {
-         symbol(const compat::vector<char> &name, resource_id section,
-                size_t offset, const compat::vector<argument> &args) :
+         symbol(const clover::compat::vector<char> &name, resource_id section,
+                size_t offset, const clover::compat::vector<argument> &args) :
                 name(name), section(section), offset(offset), args(args) { }
          symbol() : name(), section(0), offset(0), args() { }
 
-         compat::vector<char> name;
+         clover::compat::vector<char> name;
          resource_id section;
          size_t offset;
-         compat::vector<argument> args;
+         clover::compat::vector<argument> args;
       };
 
       void serialize(compat::ostream &os) const;
       static module deserialize(compat::istream &is);
 
-      compat::vector<symbol> syms;
-      compat::vector<section> secs;
+      /// Look up a symbol by name.  Throws module::noent_error if not
+      /// found.
+      const symbol &sym(compat::string name) const;
+
+      /// Look up a section by type.  Throws module::noent_error if not
+      /// found.
+      const section &sec(typename section::type type) const;
+
+      clover::compat::vector<symbol> syms;
+      clover::compat::vector<section> secs;
    };
 }
 

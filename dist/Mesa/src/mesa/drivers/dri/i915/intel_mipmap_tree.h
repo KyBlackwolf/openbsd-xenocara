@@ -1,6 +1,6 @@
 /**************************************************************************
  * 
- * Copyright 2006 VMware, Inc.
+ * Copyright 2006 Tungsten Graphics, Inc., Cedar Park, Texas.
  * All Rights Reserved.
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -18,7 +18,7 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
- * IN NO EVENT SHALL VMWARE AND/OR ITS SUPPLIERS BE LIABLE FOR
+ * IN NO EVENT SHALL TUNGSTEN GRAPHICS AND/OR ITS SUPPLIERS BE LIABLE FOR
  * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -30,9 +30,7 @@
 
 #include <assert.h>
 
-#include "intel_screen.h"
 #include "intel_regions.h"
-#include "GL/internal/dri_interface.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -149,7 +147,7 @@ struct intel_mipmap_tree
     * This is just the same as the gl_texture_image->TexFormat or
     * gl_renderbuffer->Format.
     */
-   mesa_format format;
+   gl_format format;
 
    /**
     * The X offset of each image in the miptree must be aligned to this. See
@@ -223,7 +221,7 @@ enum intel_miptree_tiling_mode {
 
 struct intel_mipmap_tree *intel_miptree_create(struct intel_context *intel,
                                                GLenum target,
-					       mesa_format format,
+					       gl_format format,
                                                GLuint first_level,
                                                GLuint last_level,
                                                GLuint width0,
@@ -235,7 +233,7 @@ struct intel_mipmap_tree *intel_miptree_create(struct intel_context *intel,
 struct intel_mipmap_tree *
 intel_miptree_create_layout(struct intel_context *intel,
                             GLenum target,
-                            mesa_format format,
+                            gl_format format,
                             GLuint first_level,
                             GLuint last_level,
                             GLuint width0,
@@ -246,7 +244,7 @@ intel_miptree_create_layout(struct intel_context *intel,
 struct intel_mipmap_tree *
 intel_miptree_create_for_bo(struct intel_context *intel,
                             drm_intel_bo *bo,
-                            mesa_format format,
+                            gl_format format,
                             uint32_t offset,
                             uint32_t width,
                             uint32_t height,
@@ -256,15 +254,8 @@ intel_miptree_create_for_bo(struct intel_context *intel,
 struct intel_mipmap_tree*
 intel_miptree_create_for_dri2_buffer(struct intel_context *intel,
                                      unsigned dri_attachment,
-                                     mesa_format format,
+                                     gl_format format,
                                      struct intel_region *region);
-
-struct intel_mipmap_tree*
-intel_miptree_create_for_image_buffer(struct intel_context *intel,
-                                      enum __DRIimageBufferMask buffer_type,
-                                      mesa_format format,
-                                      uint32_t num_samples,
-                                      struct intel_region *region);
 
 /**
  * Create a miptree appropriate as the storage for a non-texture renderbuffer.
@@ -275,7 +266,7 @@ intel_miptree_create_for_image_buffer(struct intel_context *intel,
  */
 struct intel_mipmap_tree*
 intel_miptree_create_for_renderbuffer(struct intel_context *intel,
-                                      mesa_format format,
+                                      gl_format format,
                                       uint32_t width,
                                       uint32_t height);
 

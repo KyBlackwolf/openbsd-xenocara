@@ -1,7 +1,7 @@
 /**************************************************************************
 
 Copyright 2000, 2001 ATI Technologies Inc., Ontario, Canada, and
-                     VMware, Inc.
+                     Tungsten Graphics Inc., Austin, Texas.
 
 All Rights Reserved.
 
@@ -29,7 +29,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /*
  * Authors:
- *   Keith Whitwell <keithw@vmware.com>
+ *   Keith Whitwell <keith@tungstengraphics.com>
  */
 
 #ifndef RADEON_FOG_H

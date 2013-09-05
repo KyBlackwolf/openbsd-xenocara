@@ -27,10 +27,9 @@ MacOS are all supported.
 </p>
 
 <p>
-Most modern Linux distros include the SVGA3D driver so end users shouldn't
-be concerned with this information.
-But if your distro lacks the driver or you want to update to the latest code
-these instructions explain what to do.
+End users shouldn't have to go through all these steps once the driver is
+included in newer Linux distributions.
+Fedora 18 and Ubuntu 12.10 include the VMware guest GL driver, for example.
 </p>
 
 <p>
@@ -53,13 +52,6 @@ The components involved in this include:
 <li>User-space libdrm library
 <li>Mesa/gallium OpenGL driver: "svga"
 </ul>
-
-<p>
-All of these components reside in the guest Linux virtual machine.
-On the host, all you're doing is running VMware
-<a href="http://www.vmware.com/products/workstation/">Workstation</a> or
-<a href="http://www.vmware.com/products/fusion/">Fusion</a>.
-</p>
 
 
 <h2>Prerequisites</h2>
@@ -142,7 +134,7 @@ As before, if you're on a 32-bit system, you should skip the --libdir
 configure option.
   <pre>
   cd $TOP/mesa
-  ./autogen.sh --prefix=/usr --libdir=/usr/lib64 --with-gallium-drivers=svga --with-dri-drivers= --enable-xa --disable-dri3
+  ./autogen.sh --prefix=/usr --libdir=/usr/lib64 --with-gallium-drivers=svga --with-dri-drivers= --enable-xa
   make
   sudo make install
   </pre>

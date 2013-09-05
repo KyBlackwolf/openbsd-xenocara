@@ -3,7 +3,7 @@
  * Copyright 2011-2012 Advanced Micro Devices, Inc.
  * Copyright 2010 VMware, Inc.
  * Copyright 2009 VMware, Inc.
- * Copyright 2007-2008 VMware, Inc.
+ * Copyright 2007-2008 Tungsten Graphics, Inc., Cedar Park, Texas.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -54,7 +54,7 @@ unsigned lp_bld_tgsi_list_init(struct lp_build_tgsi_context * bld_base)
 
 unsigned lp_bld_tgsi_add_instruction(
    struct lp_build_tgsi_context * bld_base,
-   const struct tgsi_full_instruction *inst_to_add)
+   struct tgsi_full_instruction *inst_to_add)
 {
 
    if (bld_base->num_instructions == bld_base->max_instructions) {
@@ -199,10 +199,6 @@ lp_build_tgsi_inst_llvm(
    LLVMValueRef val;
 
    bld_base->pc++;
-
-   if (bld_base->emit_debug) {
-      bld_base->emit_debug(bld_base, inst, info);
-   }
 
    /* Ignore deprecated instructions */
    switch (inst->Instruction.Opcode) {
@@ -469,8 +465,8 @@ lp_build_tgsi_llvm(
    }
 
    while (bld_base->pc != -1) {
-      const struct tgsi_full_instruction *instr =
-         bld_base->instructions + bld_base->pc;
+      struct tgsi_full_instruction *instr = bld_base->instructions +
+							bld_base->pc;
       const struct tgsi_opcode_info *opcode_info =
          tgsi_get_opcode_info(instr->Instruction.Opcode);
       if (!lp_build_tgsi_inst_llvm(bld_base, instr)) {

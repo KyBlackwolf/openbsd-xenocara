@@ -24,16 +24,12 @@
 
 struct glx_screen_vtable fake_glx_screen::vt = {
    indirect_create_context,
-   indirect_create_context_attribs,
-   NULL,
-   NULL,
+   indirect_create_context_attribs
 };
 
 struct glx_screen_vtable fake_glx_screen_direct::vt = {
    fake_glx_context_direct::create,
-   fake_glx_context_direct::create_attribs,
-   NULL,
-   NULL,
+   fake_glx_context_direct::create_attribs
 };
 
 const struct glx_context_vtable fake_glx_context::vt = {
@@ -74,13 +70,3 @@ indirect_create_context_attribs(struct glx_screen *base,
 
    return indirect_create_context(base, config_base, shareList, 0);
 }
-
-__thread void *__glX_tls_Context = NULL;
-
-#if defined(HAVE_PTHREAD) && !defined(GLX_USE_TLS)
-extern "C" struct glx_context *
-__glXGetCurrentContext()
-{
- return (struct glx_context *) __glX_tls_Context;
-}
-#endif

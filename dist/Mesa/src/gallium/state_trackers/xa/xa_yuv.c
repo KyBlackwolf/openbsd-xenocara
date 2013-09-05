@@ -131,7 +131,7 @@ xa_yuv_planar_blit(struct xa_context *r,
     if (ret != XA_ERR_NONE)
 	return -XA_ERR_NORES;
 
-    renderer_bind_destination(r, r->srf);
+    renderer_bind_destination(r, r->srf, r->srf->width, r->srf->height);
     xa_yuv_bind_blend_state(r);
     xa_yuv_bind_shaders(r);
     xa_yuv_bind_samplers(r, yuv);
@@ -146,7 +146,6 @@ xa_yuv_planar_blit(struct xa_context *r,
 	int w = box->x2 - box->x1;
 	int h = box->y2 - box->y1;
 
-        xa_scissor_update(r, x, y, box->x2, box->y2);
 	renderer_draw_yuv(r,
 			  (float)src_x + scale_x * (x - dst_x),
 			  (float)src_y + scale_y * (y - dst_y),

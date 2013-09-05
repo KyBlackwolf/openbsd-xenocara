@@ -36,8 +36,6 @@
 
 #include "os/os_thread.h"
 
-#include "util/u_math.h"
-
 struct util_range {
    unsigned start; /* inclusive */
    unsigned end; /* exclusive */

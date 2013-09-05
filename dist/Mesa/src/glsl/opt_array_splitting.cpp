@@ -40,8 +40,6 @@
 
 static bool debug = false;
 
-namespace {
-
 namespace opt_array_splitting {
 
 class variable_entry : public exec_node
@@ -79,7 +77,6 @@ public:
 };
 
 } /* namespace */
-
 using namespace opt_array_splitting;
 
 /**
@@ -115,15 +112,13 @@ public:
    void *mem_ctx;
 };
 
-} /* namespace */
-
 variable_entry *
 ir_array_reference_visitor::get_variable_entry(ir_variable *var)
 {
    assert(var);
 
-   if (var->data.mode != ir_var_auto &&
-       var->data.mode != ir_var_temporary)
+   if (var->mode != ir_var_auto &&
+       var->mode != ir_var_temporary)
       return NULL;
 
    if (!(var->type->is_array() || var->type->is_matrix()))
@@ -132,11 +127,11 @@ ir_array_reference_visitor::get_variable_entry(ir_variable *var)
    /* If the array hasn't been sized yet, we can't split it.  After
     * linking, this should be resolved.
     */
-   if (var->type->is_unsized_array())
+   if (var->type->is_array() && var->type->length == 0)
       return NULL;
 
-   foreach_list(n, &this->variable_list) {
-      variable_entry *entry = (variable_entry *) n;
+   foreach_iter(exec_list_iterator, iter, this->variable_list) {
+      variable_entry *entry = (variable_entry *)iter.get();
       if (entry->var == var)
 	 return entry;
    }
@@ -224,8 +219,8 @@ ir_array_reference_visitor::get_split_list(exec_list *instructions,
    }
 
    /* Trim out variables we found that we can't split. */
-   foreach_list_safe(n, &variable_list) {
-      variable_entry *entry = (variable_entry *) n;
+   foreach_iter(exec_list_iterator, iter, variable_list) {
+      variable_entry *entry = (variable_entry *)iter.get();
 
       if (debug) {
 	 printf("array %s@%p: decl %d, split %d\n",
@@ -270,8 +265,8 @@ ir_array_splitting_visitor::get_splitting_entry(ir_variable *var)
 {
    assert(var);
 
-   foreach_list(n, this->variable_list) {
-      variable_entry *entry = (variable_entry *) n;
+   foreach_iter(exec_list_iterator, iter, *this->variable_list) {
+      variable_entry *entry = (variable_entry *)iter.get();
       if (entry->var == var) {
 	 return entry;
       }
@@ -368,8 +363,8 @@ optimize_split_arrays(exec_list *instructions, bool linked)
    /* Replace the decls of the arrays to be split with their split
     * components.
     */
-   foreach_list(n, &refs.variable_list) {
-      variable_entry *entry = (variable_entry *) n;
+   foreach_iter(exec_list_iterator, iter, refs.variable_list) {
+      variable_entry *entry = (variable_entry *)iter.get();
       const struct glsl_type *type = entry->var->type;
       const struct glsl_type *subtype;
 
@@ -400,7 +395,7 @@ optimize_split_arrays(exec_list *instructions, bool linked)
    visit_list_elements(&split, instructions);
 
    if (debug)
-      _mesa_print_ir(stdout, instructions, NULL);
+      _mesa_print_ir(instructions, NULL);
 
    ralloc_free(mem_ctx);
 

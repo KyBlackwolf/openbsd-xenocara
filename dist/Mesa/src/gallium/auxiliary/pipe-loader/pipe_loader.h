@@ -18,7 +18,7 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
- * IN NO EVENT SHALL VMWARE AND/OR ITS SUPPLIERS BE LIABLE FOR
+ * IN NO EVENT SHALL TUNGSTEN GRAPHICS AND/OR ITS SUPPLIERS BE LIABLE FOR
  * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -35,21 +35,15 @@
 
 #include "pipe/p_compiler.h"
 
-#ifdef HAVE_PIPE_LOADER_XLIB
-#include <X11/Xlib.h>
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 struct pipe_screen;
-struct drisw_loader_funcs;
 
 enum pipe_loader_device_type {
    PIPE_LOADER_DEVICE_SOFTWARE,
    PIPE_LOADER_DEVICE_PCI,
-   PIPE_LOADER_DEVICE_PLATFORM,
    NUM_PIPE_LOADER_DEVICE_TYPES
 };
 
@@ -66,7 +60,7 @@ struct pipe_loader_device {
       } pci;
    } u; /**< Discriminated by \a type */
 
-   char *driver_name;
+   const char *driver_name;
    const struct pipe_loader_ops *ops;
 };
 
@@ -105,46 +99,6 @@ pipe_loader_create_screen(struct pipe_loader_device *dev,
 void
 pipe_loader_release(struct pipe_loader_device **devs, int ndev);
 
-#ifdef HAVE_PIPE_LOADER_XLIB
-
-/**
- * Initialize Xlib for an associated display.
- *
- * This function is platform-specific.
- *
- * \sa pipe_loader_probe
- */
-bool
-pipe_loader_sw_probe_xlib(struct pipe_loader_device **devs, Display *display);
-
-#endif
-
-
-#ifdef HAVE_PIPE_LOADER_DRI
-
-/**
- * Initialize sw dri device give the drisw_loader_funcs.
- *
- * This function is platform-specific.
- *
- * \sa pipe_loader_probe
- */
-bool
-pipe_loader_sw_probe_dri(struct pipe_loader_device **devs,
-                         struct drisw_loader_funcs *drisw_lf);
-
-#endif
-
-/**
- * Initialize a null sw device.
- *
- * This function is platform-specific.
- *
- * \sa pipe_loader_probe
- */
-bool
-pipe_loader_sw_probe_null(struct pipe_loader_device **devs);
-
 /**
  * Get a list of known software devices.
  *
@@ -173,13 +127,9 @@ pipe_loader_drm_probe(struct pipe_loader_device **devs, int ndev);
  * This function is platform-specific.
  *
  * \sa pipe_loader_probe
- *
- * \param auth_x If true, the pipe-loader will attempt to
- *               authenticate with the X server.
  */
-bool
-pipe_loader_drm_probe_fd(struct pipe_loader_device **dev, int fd,
-                         boolean auth_x);
+boolean
+pipe_loader_drm_probe_fd(struct pipe_loader_device **dev, int fd);
 
 #endif
 

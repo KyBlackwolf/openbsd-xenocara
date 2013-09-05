@@ -29,13 +29,18 @@
 
 #include <llvm-c/Core.h>
 
-struct radeon_shader_binary;
+struct radeon_llvm_binary {
+	unsigned char *code;
+	unsigned code_size;
+	unsigned char *config;
+	unsigned config_size;
+};
 
 void radeon_llvm_shader_type(LLVMValueRef F, unsigned type);
 
 unsigned  radeon_llvm_compile(
 	LLVMModuleRef M,
-	struct radeon_shader_binary *binary,
+	struct radeon_llvm_binary *binary,
 	const char * gpu_family,
 	unsigned dump);
 

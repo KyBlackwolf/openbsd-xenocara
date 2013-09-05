@@ -28,7 +28,6 @@
 #include "postprocess/postprocess.h"
 #include "postprocess/pp_colors.h"
 #include "postprocess/pp_filters.h"
-#include "postprocess/pp_private.h"
 
 /** The run function of the color filters */
 void
@@ -36,7 +35,7 @@ pp_nocolor(struct pp_queue_t *ppq, struct pipe_resource *in,
            struct pipe_resource *out, unsigned int n)
 {
 
-   struct pp_program *p = ppq->p;
+   struct program *p = ppq->p;
 
    pp_filter_setup_in(p, in);
    pp_filter_setup_out(p, out);

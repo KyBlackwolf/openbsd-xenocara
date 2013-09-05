@@ -18,7 +18,7 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
- * IN NO EVENT SHALL VMWARE AND/OR ITS SUPPLIERS BE LIABLE FOR
+ * IN NO EVENT SHALL TUNGSTEN GRAPHICS AND/OR ITS SUPPLIERS BE LIABLE FOR
  * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -147,8 +147,7 @@ vl_video_buffer_surface_format(enum pipe_format format)
 boolean
 vl_video_buffer_is_format_supported(struct pipe_screen *screen,
                                     enum pipe_format format,
-                                    enum pipe_video_profile profile,
-                                    enum pipe_video_entrypoint entrypoint)
+                                    enum pipe_video_profile profile)
 {
    const enum pipe_format *resource_formats;
    unsigned i;
@@ -187,11 +186,11 @@ vl_video_buffer_max_size(struct pipe_screen *screen)
 
 void
 vl_video_buffer_set_associated_data(struct pipe_video_buffer *vbuf,
-                                    struct pipe_video_codec *vcodec,
+                                    struct pipe_video_decoder *vdec,
                                     void *associated_data,
                                     void (*destroy_associated_data)(void *))
 {
-   vbuf->codec = vcodec;
+   vbuf->decoder = vdec;
 
    if (vbuf->associated_data == associated_data)
       return;
@@ -205,9 +204,9 @@ vl_video_buffer_set_associated_data(struct pipe_video_buffer *vbuf,
 
 void *
 vl_video_buffer_get_associated_data(struct pipe_video_buffer *vbuf,
-                                    struct pipe_video_codec *vcodec)
+                                    struct pipe_video_decoder *vdec)
 {
-   if (vbuf->codec == vcodec)
+   if (vbuf->decoder == vdec)
       return vbuf->associated_data;
    else
       return NULL;
@@ -240,7 +239,7 @@ vl_video_buffer_template(struct pipe_resource *templ,
          templ->width0 /= 2;
          templ->height0 /= 2;
       } else if (tmpl->chroma_format == PIPE_VIDEO_CHROMA_FORMAT_422) {
-         templ->width0 /= 2;
+         templ->height0 /= 2;
       }
    }
 }
@@ -259,7 +258,7 @@ vl_video_buffer_destroy(struct pipe_video_buffer *buffer)
       pipe_resource_reference(&buf->resources[i], NULL);
    }
 
-   for (i = 0; i < VL_MAX_SURFACES; ++i)
+   for (i = 0; i < VL_NUM_COMPONENTS * 2; ++i)
       pipe_surface_reference(&buf->surfaces[i], NULL);
 
    vl_video_buffer_set_associated_data(buffer, NULL, NULL, NULL);
@@ -365,7 +364,7 @@ vl_video_buffer_surfaces(struct pipe_video_buffer *buffer)
    array_size = buffer->interlaced ? 2 : 1;
    for (i = 0, surf = 0; i < VL_NUM_COMPONENTS; ++i) {
       for (j = 0; j < array_size; ++j, ++surf) {
-         assert(surf < VL_MAX_SURFACES);
+         assert(surf < (VL_NUM_COMPONENTS * 2));
 
          if (!buf->resources[i]) {
             pipe_surface_reference(&buf->surfaces[surf], NULL);
@@ -386,7 +385,7 @@ vl_video_buffer_surfaces(struct pipe_video_buffer *buffer)
    return buf->surfaces;
 
 error:
-   for (i = 0; i < VL_MAX_SURFACES; ++i )
+   for (i = 0; i < (VL_NUM_COMPONENTS * 2); ++i )
       pipe_surface_reference(&buf->surfaces[i], NULL);
 
    return NULL;
@@ -407,7 +406,6 @@ vl_video_buffer_create(struct pipe_context *pipe,
    (
       pipe->screen,
       PIPE_VIDEO_PROFILE_UNKNOWN,
-      PIPE_VIDEO_ENTRYPOINT_UNKNOWN,
       PIPE_VIDEO_CAP_NPOT_TEXTURES
    );
 
@@ -427,7 +425,7 @@ vl_video_buffer_create(struct pipe_context *pipe,
    result = vl_video_buffer_create_ex
    (
       pipe, &templat, resource_formats,
-      1, tmpl->interlaced ? 2 : 1, PIPE_USAGE_DEFAULT
+      1, tmpl->interlaced ? 2 : 1, PIPE_USAGE_STATIC
    );
 
 
@@ -492,8 +490,6 @@ vl_video_buffer_create_ex2(struct pipe_context *pipe,
    unsigned i;
 
    buffer = CALLOC_STRUCT(vl_video_buffer);
-   if (!buffer)
-      return NULL;
 
    buffer->base = *tmpl;
    buffer->base.context = pipe;

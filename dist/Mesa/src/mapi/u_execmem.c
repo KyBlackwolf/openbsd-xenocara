@@ -39,7 +39,7 @@
 
 #define EXEC_MAP_SIZE (4*1024)
 
-static mtx_t exec_mutex = _MTX_INITIALIZER_NP;
+u_mutex_declare_static(exec_mutex);
 
 static unsigned int head = 0;
 
@@ -123,7 +123,7 @@ u_execmem_alloc(unsigned int size)
 {
    void *addr = NULL;
 
-   mtx_lock(&exec_mutex);
+   u_mutex_lock(exec_mutex);
 
    if (!init_map())
       goto bail;
@@ -137,7 +137,7 @@ u_execmem_alloc(unsigned int size)
    head += size;
 
 bail:
-   mtx_unlock(&exec_mutex);
+   u_mutex_unlock(exec_mutex);
 
    return addr;
 }

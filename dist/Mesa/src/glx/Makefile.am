@@ -21,10 +21,12 @@
 
 if HAVE_SHARED_GLAPI
 SHARED_GLAPI_CFLAGS = -DGLX_SHARED_GLAPI
-SHARED_GLAPI_LIB = $(top_builddir)/src/mapi/shared-glapi/libglapi.la
+SHARED_GLAPI_LIBS = $(top_builddir)/src/mapi/shared-glapi/libglapi.la
 endif
 
 SUBDIRS=. tests
+
+GLAPI_LIB = $(top_builddir)/src/mapi/glapi/libglapi.la
 
 if HAVE_XF86VIDMODE
 EXTRA_DEFINES_XF86VIDMODE = -DXF86VIDMODE
@@ -33,7 +35,6 @@ endif
 AM_CFLAGS = \
 	-I$(top_srcdir)/include \
 	-I$(top_srcdir)/include/GL/internal \
-	-I$(top_srcdir)/src/loader \
 	-I$(top_srcdir)/src/mapi \
 	-I$(top_srcdir)/src/mapi/glapi \
 	-I$(top_builddir)/src/mapi \
@@ -76,7 +77,6 @@ libglx_la_SOURCES = \
 	  indirect_vertex_program.c \
 	  pixel.c \
 	  pixelstore.c \
-	  query_renderer.c \
 	  render2.c \
 	  renderpix.c \
 	  single2.c \
@@ -92,31 +92,25 @@ libglx_la_SOURCES = \
 	  glxhash.c \
 	  dri2_glx.c \
 	  dri2.c \
-	  dri2_query_renderer.c \
 	  applegl_glx.c
-
-if HAVE_DRI3
-libglx_la_SOURCES += \
-          dri3_glx.c
-endif
-
-libglx_la_LIBADD = $(top_builddir)/src/loader/libloader.la
 
 GL_LIBS = \
 	libglx.la \
-	$(top_builddir)/src/mapi/glapi/libglapi.la \
-	$(SHARED_GLAPI_LIB) \
+	$(SHARED_GLAPI_LIBS) \
+	$(GLAPI_LIB) \
 	$(GL_LIB_DEPS)
 
 GL_LDFLAGS = \
-	-no-undefined \
-	-version-number 1:2 \
 	-Wl,-Bsymbolic \
-	$(GC_SECTIONS) \
-	$(LD_NO_UNDEFINED)
+	-version-number 1:2 -no-undefined
 
 lib@GL_LIB@_la_SOURCES =
 lib@GL_LIB@_la_LIBADD = $(GL_LIBS)
 lib@GL_LIB@_la_LDFLAGS = $(GL_LDFLAGS)
 
-include $(top_srcdir)/install-lib-links.mk
+# Provide compatibility with scripts for the old Mesa build system for
+# a while by putting a link to the driver into /lib of the build tree.
+all-local: lib@GL_LIB@.la
+	$(MKDIR_P) $(top_builddir)/$(LIB_DIR);
+	ln -f .libs/lib@GL_LIB@.so.1.2.0 $(top_builddir)/$(LIB_DIR)/lib@GL_LIB@.so.1
+	ln -sf lib@GL_LIB@.so.1 $(top_builddir)/$(LIB_DIR)/lib@GL_LIB@.so

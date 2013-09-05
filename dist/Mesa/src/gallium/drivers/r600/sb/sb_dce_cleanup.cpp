@@ -56,8 +56,7 @@ bool dce_cleanup::visit(cf_node& n, bool enter) {
 		else
 			cleanup_dst(n);
 	} else {
-		if ((sh.dce_flags & DF_EXPAND) &&
-				(n.bc.op_ptr->flags & (CF_CLAUSE | CF_BRANCH | CF_LOOP)))
+		if (n.bc.op_ptr->flags & (CF_CLAUSE | CF_BRANCH | CF_LOOP))
 			n.expand();
 	}
 	return true;
@@ -108,20 +107,19 @@ bool dce_cleanup::visit(region_node& n, bool enter) {
 }
 
 void dce_cleanup::cleanup_dst(node& n) {
-	if (!cleanup_dst_vec(n.dst) && remove_unused &&
-			!n.dst.empty() && !(n.flags & NF_DONT_KILL) && n.parent)
-		n.remove();
+	cleanup_dst_vec(n.dst);
 }
 
 bool dce_cleanup::visit(container_node& n, bool enter) {
-	if (enter)
+	if (enter) {
 		cleanup_dst(n);
+	} else {
+
+	}
 	return true;
 }
 
-bool dce_cleanup::cleanup_dst_vec(vvec& vv) {
-	bool alive = false;
-
+void dce_cleanup::cleanup_dst_vec(vvec& vv) {
 	for (vvec::iterator I = vv.begin(), E = vv.end(); I != E; ++I) {
 		value* &v = *I;
 		if (!v)
@@ -130,13 +128,9 @@ bool dce_cleanup::cleanup_dst_vec(vvec& vv) {
 		if (v->gvn_source && v->gvn_source->is_dead())
 			v->gvn_source = NULL;
 
-		if (v->is_dead() || (remove_unused && !v->is_rel() && !v->uses))
+		if (v->is_dead())
 			v = NULL;
-		else
-			alive = true;
 	}
-
-	return alive;
 }
 
 } // namespace r600_sb

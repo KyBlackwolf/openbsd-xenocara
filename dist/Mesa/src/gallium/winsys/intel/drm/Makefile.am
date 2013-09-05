@@ -25,8 +25,9 @@ include Makefile.sources
 include $(top_srcdir)/src/gallium/Automake.inc
 
 AM_CFLAGS = \
-	$(GALLIUM_WINSYS_CFLAGS) \
-	$(INTEL_CFLAGS)
+	$(GALLIUM_CFLAGS) \
+	$(INTEL_CFLAGS) \
+	$(VISIBILITY_CFLAGS)
 
 noinst_LTLIBRARIES = libintelwinsys.la
 

@@ -137,7 +137,7 @@ void bc_dump::dump(cf_node& n) {
 		for (int k = 0; k < 4; ++k)
 			s << chans[n.bc.sel[k]];
 
-	} else if (n.bc.op_ptr->flags & CF_MEM) {
+	} else if (n.bc.op_ptr->flags & (CF_STRM | CF_RAT)) {
 		static const char *exp_type[] = {"WRITE", "WRITE_IND", "WRITE_ACK",
 				"WRITE_IND_ACK"};
 		fill_to(s, 18);
@@ -149,9 +149,6 @@ void bc_dump::dump(cf_node& n) {
 
 		if ((n.bc.op_ptr->flags & CF_RAT) && (n.bc.type & 1)) {
 			s << ", @R" << n.bc.index_gpr << ".xyz";
-		}
-		if ((n.bc.op_ptr->flags & CF_MEM) && (n.bc.type & 1)) {
-			s << ", @R" << n.bc.index_gpr << ".x";
 		}
 
 		s << "  ES:" << n.bc.elem_size;
@@ -177,7 +174,7 @@ void bc_dump::dump(cf_node& n) {
 		}
 
 		if (n.bc.cond)
-			s << " CND:" << n.bc.cond;
+			s << " CND:" << n.bc.pop_count;
 
 		if (n.bc.pop_count)
 			s << " POP:" << n.bc.pop_count;

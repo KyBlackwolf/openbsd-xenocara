@@ -120,7 +120,7 @@ fd_set_framebuffer_state(struct pipe_context *pctx,
 	unsigned i;
 
 	DBG("%d: cbufs[0]=%p, zsbuf=%p", ctx->needs_flush,
-			framebuffer->cbufs[0], framebuffer->zsbuf);
+			cso->cbufs[0], cso->zsbuf);
 
 	fd_context_render(pctx);
 
@@ -130,11 +130,6 @@ fd_set_framebuffer_state(struct pipe_context *pctx,
 		pipe_surface_reference(&cso->cbufs[i], NULL);
 
 	cso->nr_cbufs = framebuffer->nr_cbufs;
-
-	if ((cso->width != framebuffer->width) ||
-			(cso->height != framebuffer->height))
-		ctx->needs_rb_fbd = true;
-
 	cso->width = framebuffer->width;
 	cso->height = framebuffer->height;
 

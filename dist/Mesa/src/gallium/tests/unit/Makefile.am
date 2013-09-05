@@ -14,7 +14,9 @@ LDADD = \
 	$(top_builddir)/src/gallium/drivers/trace/libtrace.la \
 	$(top_builddir)/src/gallium/winsys/sw/null/libws_null.la \
 	$(top_builddir)/src/gallium/drivers/softpipe/libsoftpipe.la \
-	$(GALLIUM_COMMON_LIB_DEPS)
+	$(DLOPEN_LIBS) \
+	$(PTHREAD_LIBS) \
+	-lm
 
 noinst_PROGRAMS = pipe_barrier_test u_cache_test u_half_test \
 	u_format_test u_format_compatible_test translate_test

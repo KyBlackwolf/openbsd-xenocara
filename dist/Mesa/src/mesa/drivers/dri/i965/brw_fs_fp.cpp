@@ -30,6 +30,13 @@
 #include "brw_context.h"
 #include "brw_fs.h"
 
+static fs_reg
+regoffset(fs_reg reg, int i)
+{
+   reg.reg_offset += i;
+   return reg;
+}
+
 void
 fs_visitor::emit_fp_alu1(enum opcode opcode,
                          const struct prog_instruction *fpi,
@@ -37,7 +44,7 @@ fs_visitor::emit_fp_alu1(enum opcode opcode,
 {
    for (int i = 0; i < 4; i++) {
       if (fpi->DstReg.WriteMask & (1 << i))
-         emit(opcode, offset(dst, i), offset(src, i));
+         emit(opcode, regoffset(dst, i), regoffset(src, i));
    }
 }
 
@@ -48,8 +55,8 @@ fs_visitor::emit_fp_alu2(enum opcode opcode,
 {
    for (int i = 0; i < 4; i++) {
       if (fpi->DstReg.WriteMask & (1 << i))
-         emit(opcode, offset(dst, i),
-              offset(src0, i), offset(src1, i));
+         emit(opcode, regoffset(dst, i),
+              regoffset(src0, i), regoffset(src1, i));
    }
 }
 
@@ -65,8 +72,8 @@ fs_visitor::emit_fp_minmax(const prog_instruction *fpi,
 
    for (int i = 0; i < 4; i++) {
       if (fpi->DstReg.WriteMask & (1 << i)) {
-         emit_minmax(conditionalmod, offset(dst, i),
-                     offset(src0, i), offset(src1, i));
+         emit_minmax(conditionalmod, regoffset(dst, i),
+                     regoffset(src0, i), regoffset(src1, i));
       }
    }
 }
@@ -81,10 +88,10 @@ fs_visitor::emit_fp_sop(uint32_t conditional_mod,
       if (fpi->DstReg.WriteMask & (1 << i)) {
          fs_inst *inst;
 
-         emit(CMP(reg_null_d, offset(src0, i), offset(src1, i),
+         emit(CMP(reg_null_d, regoffset(src0, i), regoffset(src1, i),
                   conditional_mod));
 
-         inst = emit(BRW_OPCODE_SEL, offset(dst, i), one, fs_reg(0.0f));
+         inst = emit(BRW_OPCODE_SEL, regoffset(dst, i), one, fs_reg(0.0f));
          inst->predicate = BRW_PREDICATE_NORMAL;
       }
    }
@@ -96,7 +103,7 @@ fs_visitor::emit_fp_scalar_write(const struct prog_instruction *fpi,
 {
    for (int i = 0; i < 4; i++) {
       if (fpi->DstReg.WriteMask & (1 << i))
-         emit(MOV(offset(dst, i), src));
+         emit(MOV(regoffset(dst, i), src));
    }
 }
 
@@ -130,8 +137,8 @@ fs_visitor::emit_fragment_program_code()
    fs_reg one = fs_reg(this, glsl_type::float_type);
    emit(MOV(one, fs_reg(1.0f)));
 
-   for (unsigned int insn = 0; insn < prog->NumInstructions; insn++) {
-      const struct prog_instruction *fpi = &prog->Instructions[insn];
+   for (unsigned int insn = 0; insn < fp->Base.NumInstructions; insn++) {
+      const struct prog_instruction *fpi = &fp->Base.Instructions[insn];
       base_ir = fpi;
 
       //_mesa_print_instruction(fpi);
@@ -163,11 +170,11 @@ fs_visitor::emit_fragment_program_code()
             if (fpi->DstReg.WriteMask & (1 << i)) {
                fs_inst *inst;
 
-               emit(CMP(null, offset(src[0], i), fs_reg(0.0f),
+               emit(CMP(null, regoffset(src[0], i), fs_reg(0.0f),
                         BRW_CONDITIONAL_L));
 
-               inst = emit(BRW_OPCODE_SEL, offset(dst, i),
-                           offset(src[1], i), offset(src[2], i));
+               inst = emit(BRW_OPCODE_SEL, regoffset(dst, i),
+                           regoffset(src[1], i), regoffset(src[2], i));
                inst->predicate = BRW_PREDICATE_NORMAL;
             }
          }
@@ -193,14 +200,14 @@ fs_visitor::emit_fragment_program_code()
          default: assert(!"not reached"); count = 0; break;
          }
 
-         emit(MUL(acc, offset(src[0], 0), offset(src[1], 0)));
+         emit(MUL(acc, regoffset(src[0], 0), regoffset(src[1], 0)));
          for (int i = 1; i < count; i++) {
-            emit(MUL(mul, offset(src[0], i), offset(src[1], i)));
+            emit(MUL(mul, regoffset(src[0], i), regoffset(src[1], i)));
             emit(ADD(acc, acc, mul));
          }
 
          if (fpi->Opcode == OPCODE_DPH)
-            emit(ADD(acc, acc, offset(src[1], 3)));
+            emit(ADD(acc, acc, regoffset(src[1], 3)));
 
          emit_fp_scalar_write(fpi, dst, acc);
          break;
@@ -210,13 +217,13 @@ fs_visitor::emit_fragment_program_code()
          if (fpi->DstReg.WriteMask & WRITEMASK_X)
             emit(MOV(dst, fs_reg(1.0f)));
          if (fpi->DstReg.WriteMask & WRITEMASK_Y) {
-            emit(MUL(offset(dst, 1),
-                     offset(src[0], 1), offset(src[1], 1)));
+            emit(MUL(regoffset(dst, 1),
+                     regoffset(src[0], 1), regoffset(src[1], 1)));
          }
          if (fpi->DstReg.WriteMask & WRITEMASK_Z)
-            emit(MOV(offset(dst, 2), offset(src[0], 2)));
+            emit(MOV(regoffset(dst, 2), regoffset(src[0], 2)));
          if (fpi->DstReg.WriteMask & WRITEMASK_W)
-            emit(MOV(offset(dst, 3), offset(src[1], 3)));
+            emit(MOV(regoffset(dst, 3), regoffset(src[1], 3)));
          break;
 
       case OPCODE_EX2:
@@ -250,7 +257,7 @@ fs_visitor::emit_fragment_program_code()
              * undiscarded pixels, and updates just those pixels to be
              * turned off.
              */
-            fs_inst *cmp = emit(CMP(null, offset(src[0], i), fs_reg(0.0f),
+            fs_inst *cmp = emit(CMP(null, regoffset(src[0], i), fs_reg(0.0f),
                                     BRW_CONDITIONAL_GE));
             cmp->predicate = BRW_PREDICATE_NORMAL;
             cmp->flag_subreg = 1;
@@ -279,40 +286,40 @@ fs_visitor::emit_fragment_program_code()
           * brw_wm_emit.c either.
           */
          if (fpi->DstReg.WriteMask & WRITEMASK_X)
-            emit(MOV(offset(dst, 0), fs_reg(1.0f)));
+            emit(MOV(regoffset(dst, 0), fs_reg(1.0f)));
 
          if (fpi->DstReg.WriteMask & WRITEMASK_YZ) {
             fs_inst *inst;
-            emit(CMP(null, offset(src[0], 0), fs_reg(0.0f),
+            emit(CMP(null, regoffset(src[0], 0), fs_reg(0.0f),
                      BRW_CONDITIONAL_LE));
 
             if (fpi->DstReg.WriteMask & WRITEMASK_Y) {
-               emit(MOV(offset(dst, 1), offset(src[0], 0)));
-               inst = emit(MOV(offset(dst, 1), fs_reg(0.0f)));
+               emit(MOV(regoffset(dst, 1), regoffset(src[0], 0)));
+               inst = emit(MOV(regoffset(dst, 1), fs_reg(0.0f)));
                inst->predicate = BRW_PREDICATE_NORMAL;
             }
 
             if (fpi->DstReg.WriteMask & WRITEMASK_Z) {
-               emit_math(SHADER_OPCODE_POW, offset(dst, 2),
-                         offset(src[0], 1), offset(src[0], 3));
+               emit_math(SHADER_OPCODE_POW, regoffset(dst, 2),
+                         regoffset(src[0], 1), regoffset(src[0], 3));
 
-               inst = emit(MOV(offset(dst, 2), fs_reg(0.0f)));
+               inst = emit(MOV(regoffset(dst, 2), fs_reg(0.0f)));
                inst->predicate = BRW_PREDICATE_NORMAL;
             }
          }
 
          if (fpi->DstReg.WriteMask & WRITEMASK_W)
-            emit(MOV(offset(dst, 3), fs_reg(1.0f)));
+            emit(MOV(regoffset(dst, 3), fs_reg(1.0f)));
 
          break;
 
       case OPCODE_LRP:
          for (int i = 0; i < 4; i++) {
             if (fpi->DstReg.WriteMask & (1 << i)) {
-               fs_reg a = offset(src[0], i);
-               fs_reg y = offset(src[1], i);
-               fs_reg x = offset(src[2], i);
-               emit_lrp(offset(dst, i), x, y, a);
+               fs_reg a = regoffset(src[0], i);
+               fs_reg y = regoffset(src[1], i);
+               fs_reg x = regoffset(src[2], i);
+               emit_lrp(regoffset(dst, i), x, y, a);
             }
          }
          break;
@@ -321,8 +328,8 @@ fs_visitor::emit_fragment_program_code()
          for (int i = 0; i < 4; i++) {
             if (fpi->DstReg.WriteMask & (1 << i)) {
                fs_reg temp = fs_reg(this, glsl_type::float_type);
-               emit(MUL(temp, offset(src[0], i), offset(src[1], i)));
-               emit(ADD(offset(dst, i), temp, offset(src[2], i)));
+               emit(MUL(temp, regoffset(src[0], i), regoffset(src[1], i)));
+               emit(ADD(regoffset(dst, i), temp, regoffset(src[2], i)));
             }
          }
          break;
@@ -360,13 +367,13 @@ fs_visitor::emit_fragment_program_code()
 
       case OPCODE_SCS:
          if (fpi->DstReg.WriteMask & WRITEMASK_X) {
-            emit_math(SHADER_OPCODE_COS, offset(dst, 0),
-                      offset(src[0], 0));
+            emit_math(SHADER_OPCODE_COS, regoffset(dst, 0),
+                      regoffset(src[0], 0));
          }
 
          if (fpi->DstReg.WriteMask & WRITEMASK_Y) {
-            emit_math(SHADER_OPCODE_SIN, offset(dst, 1),
-                      offset(src[0], 1));
+            emit_math(SHADER_OPCODE_SIN, regoffset(dst, 1),
+                      regoffset(src[0], 1));
          }
          break;
 
@@ -416,16 +423,16 @@ fs_visitor::emit_fragment_program_code()
 
             coordinate = fs_reg(this, glsl_type::vec3_type);
             fs_reg invproj = fs_reg(this, glsl_type::float_type);
-            emit_math(SHADER_OPCODE_RCP, invproj, offset(src[0], 3));
+            emit_math(SHADER_OPCODE_RCP, invproj, regoffset(src[0], 3));
             for (int i = 0; i < 3; i++) {
-               emit(MUL(offset(coordinate, i),
-                        offset(src[0], i), invproj));
+               emit(MUL(regoffset(coordinate, i),
+                        regoffset(src[0], i), invproj));
             }
             break;
          }
          case OPCODE_TXB:
             ir = new(mem_ctx) ir_texture(ir_txb);
-            lod = offset(src[0], 3);
+            lod = regoffset(src[0], 3);
             break;
          default:
             assert(!"not reached");
@@ -461,13 +468,13 @@ fs_visitor::emit_fragment_program_code()
             abscoord.negate = false;
             abscoord.abs = true;
             emit_minmax(BRW_CONDITIONAL_GE, temp,
-                        offset(abscoord, 0), offset(abscoord, 1));
+                        regoffset(abscoord, 0), regoffset(abscoord, 1));
             emit_minmax(BRW_CONDITIONAL_GE, temp,
-                        temp, offset(abscoord, 2));
+                        temp, regoffset(abscoord, 2));
             emit_math(SHADER_OPCODE_RCP, temp, temp);
             for (int i = 0; i < 3; i++) {
-               emit(MUL(offset(cubecoord, i),
-                        offset(coordinate, i), temp));
+               emit(MUL(regoffset(cubecoord, i),
+                        regoffset(coordinate, i), temp));
             }
 
             coordinate = cubecoord;
@@ -483,18 +490,18 @@ fs_visitor::emit_fragment_program_code()
          ir_constant_data junk_data;
          ir->coordinate = new(mem_ctx) ir_constant(coordinate_type, &junk_data);
 
-         if (fpi->TexShadow) {
-            shadow_c = offset(coordinate, 2);
-            ir->shadow_comparitor = new(mem_ctx) ir_constant(0.0f);
-         }
-
          coordinate = rescale_texcoord(ir, coordinate,
                                        fpi->TexSrcTarget == TEXTURE_RECT_INDEX,
                                        fpi->TexSrcUnit, fpi->TexSrcUnit);
 
+         if (fpi->TexShadow) {
+            shadow_c = regoffset(coordinate, 2);
+            ir->shadow_comparitor = new(mem_ctx) ir_constant(0.0f);
+         }
+
          fs_inst *inst;
          if (brw->gen >= 7) {
-            inst = emit_texture_gen7(ir, dst, coordinate, shadow_c, lod, dpdy, sample_index, fs_reg(0u), fpi->TexSrcUnit);
+            inst = emit_texture_gen7(ir, dst, coordinate, shadow_c, lod, dpdy, sample_index);
          } else if (brw->gen >= 5) {
             inst = emit_texture_gen5(ir, dst, coordinate, shadow_c, lod, dpdy, sample_index);
          } else {
@@ -525,12 +532,12 @@ fs_visitor::emit_fragment_program_code()
                int i2 = (i + 2) % 3;
 
                fs_reg temp = fs_reg(this, glsl_type::float_type);
-               fs_reg neg_src1_1 = offset(src[1], i1);
+               fs_reg neg_src1_1 = regoffset(src[1], i1);
                neg_src1_1.negate = !neg_src1_1.negate;
-               emit(MUL(temp, offset(src[0], i2), neg_src1_1));
-               emit(MUL(offset(dst, i),
-                        offset(src[0], i1), offset(src[1], i2)));
-               emit(ADD(offset(dst, i), offset(dst, i), temp));
+               emit(MUL(temp, regoffset(src[0], i2), neg_src1_1));
+               emit(MUL(regoffset(dst, i),
+                        regoffset(src[0], i1), regoffset(src[1], i2)));
+               emit(ADD(regoffset(dst, i), regoffset(dst, i), temp));
             }
          }
          break;
@@ -551,8 +558,8 @@ fs_visitor::emit_fragment_program_code()
 
          for (int i = 0; i < 4; i++) {
             if (fpi->DstReg.WriteMask & (1 << i)) {
-               fs_inst *inst = emit(MOV(offset(real_dst, i),
-                                        offset(dst, i)));
+               fs_inst *inst = emit(MOV(regoffset(real_dst, i),
+                                        regoffset(dst, i)));
                inst->saturate = fpi->SaturateMode;
             }
          }
@@ -567,7 +574,7 @@ fs_visitor::emit_fragment_program_code()
    this->current_annotation = "result.depth write";
    if (frag_depth.file != BAD_FILE) {
       fs_reg temp = fs_reg(this, glsl_type::float_type);
-      emit(MOV(temp, offset(frag_depth, 2)));
+      emit(MOV(temp, regoffset(frag_depth, 2)));
       frag_depth = temp;
    }
 }
@@ -576,7 +583,7 @@ void
 fs_visitor::setup_fp_regs()
 {
    /* PROGRAM_TEMPORARY */
-   int num_temp = prog->NumTemporaries;
+   int num_temp = fp->Base.NumTemporaries;
    fp_temp_regs = rzalloc_array(mem_ctx, fs_reg, num_temp);
    for (int i = 0; i < num_temp; i++)
       fp_temp_regs[i] = fs_reg(this, glsl_type::vec4_type);
@@ -584,32 +591,32 @@ fs_visitor::setup_fp_regs()
    /* PROGRAM_STATE_VAR etc. */
    if (dispatch_width == 8) {
       for (unsigned p = 0;
-           p < prog->Parameters->NumParameters; p++) {
+           p < fp->Base.Parameters->NumParameters; p++) {
          for (unsigned int i = 0; i < 4; i++) {
-            stage_prog_data->param[uniforms++] =
-               &prog->Parameters->ParameterValues[p][i].f;
+            c->prog_data.param[c->prog_data.nr_params++] =
+               &fp->Base.Parameters->ParameterValues[p][i].f;
          }
       }
    }
 
    fp_input_regs = rzalloc_array(mem_ctx, fs_reg, VARYING_SLOT_MAX);
    for (int i = 0; i < VARYING_SLOT_MAX; i++) {
-      if (prog->InputsRead & BITFIELD64_BIT(i)) {
+      if (fp->Base.InputsRead & BITFIELD64_BIT(i)) {
          /* Make up a dummy instruction to reuse code for emitting
           * interpolation.
           */
          ir_variable *ir = new(mem_ctx) ir_variable(glsl_type::vec4_type,
                                                     "fp_input",
                                                     ir_var_shader_in);
-         ir->data.location = i;
+         ir->location = i;
 
          this->current_annotation = ralloc_asprintf(ctx, "interpolate input %d",
                                                     i);
 
          switch (i) {
          case VARYING_SLOT_POS:
-            ir->data.pixel_center_integer = fp->PixelCenterInteger;
-            ir->data.origin_upper_left = fp->OriginUpperLeft;
+            ir->pixel_center_integer = fp->PixelCenterInteger;
+            ir->origin_upper_left = fp->OriginUpperLeft;
             fp_input_regs[i] = *emit_fragcoord_interpolation(ir);
             break;
          case VARYING_SLOT_FACE:
@@ -619,9 +626,9 @@ fs_visitor::setup_fp_regs()
             fp_input_regs[i] = *emit_general_interpolation(ir);
 
             if (i == VARYING_SLOT_FOGC) {
-               emit(MOV(offset(fp_input_regs[i], 1), fs_reg(0.0f)));
-               emit(MOV(offset(fp_input_regs[i], 2), fs_reg(0.0f)));
-               emit(MOV(offset(fp_input_regs[i], 3), fs_reg(1.0f)));
+               emit(MOV(regoffset(fp_input_regs[i], 1), fs_reg(0.0f)));
+               emit(MOV(regoffset(fp_input_regs[i], 2), fs_reg(0.0f)));
+               emit(MOV(regoffset(fp_input_regs[i], 3), fs_reg(1.0f)));
             }
 
             break;
@@ -680,7 +687,7 @@ fs_visitor::get_fp_dst_reg(const prog_dst_register *dst)
 fs_reg
 fs_visitor::get_fp_src_reg(const prog_src_register *src)
 {
-   struct gl_program_parameter_list *plist = prog->Parameters;
+   struct gl_program_parameter_list *plist = fp->Base.Parameters;
 
    fs_reg result;
 
@@ -709,7 +716,7 @@ fs_visitor::get_fp_src_reg(const prog_src_register *src)
          result = fs_reg(this, glsl_type::vec4_type);
 
          for (int i = 0; i < 4; i++) {
-            emit(MOV(offset(result, i),
+            emit(MOV(regoffset(result, i),
                      fs_reg(plist->ParameterValues[src->Index][i].f)));
          }
          break;
@@ -743,15 +750,15 @@ fs_visitor::get_fp_src_reg(const prog_src_register *src)
           */
          int src_swiz = GET_SWZ(src->Swizzle, i);
          if (src_swiz == SWIZZLE_ZERO) {
-            emit(MOV(offset(result, i), fs_reg(0.0f)));
+            emit(MOV(regoffset(result, i), fs_reg(0.0f)));
          } else if (src_swiz == SWIZZLE_ONE) {
-            emit(MOV(offset(result, i),
+            emit(MOV(regoffset(result, i),
                      negate ? fs_reg(-1.0f) : fs_reg(1.0f)));
          } else {
-            fs_reg src = offset(unswizzled, src_swiz);
+            fs_reg src = regoffset(unswizzled, src_swiz);
             if (negate)
                src.negate = !src.negate;
-            emit(MOV(offset(result, i), src));
+            emit(MOV(regoffset(result, i), src));
          }
       }
    }

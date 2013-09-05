@@ -20,6 +20,8 @@
 // OTHER DEALINGS IN THE SOFTWARE.
 //
 
+#include <algorithm>
+
 #include "core/format.hpp"
 #include "core/memory.hpp"
 #include "pipe/p_screen.h"
@@ -143,7 +145,7 @@ namespace clover {
    }
 
    std::set<cl_image_format>
-   supported_formats(const context &ctx, cl_mem_object_type type) {
+   supported_formats(cl_context ctx, cl_mem_object_type type) {
       std::set<cl_image_format> s;
       pipe_texture_target target = translate_target(type);
       unsigned bindings = (PIPE_BIND_SAMPLER_VIEW |
@@ -152,10 +154,11 @@ namespace clover {
                            PIPE_BIND_TRANSFER_WRITE);
 
       for (auto f : formats) {
-         if (all_of([=](const device &dev) {
-                  return dev.pipe->is_format_supported(
-                     dev.pipe, f.second, target, 1, bindings);
-               }, ctx.devices()))
+         if (std::all_of(ctx->devs.begin(), ctx->devs.end(),
+                         [=](const device *dev) {
+                            return dev->pipe->is_format_supported(
+                               dev->pipe, f.second, target, 1, bindings);
+                         }))
             s.insert(f.first);
       }
 

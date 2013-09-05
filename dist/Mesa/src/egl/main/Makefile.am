@@ -19,6 +19,12 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
+GLAPI_LIB = ../mapi/glapi/libglapi.la
+
+if HAVE_XF86VIDMODE
+EXTRA_DEFINES_XF86VIDMODE = -DXF86VIDMODE
+endif
+
 AM_CFLAGS = \
 	-I$(top_srcdir)/include \
 	-I$(top_srcdir)/src/gbm/main \
@@ -33,51 +39,43 @@ lib_LTLIBRARIES = libEGL.la
 
 libEGL_la_SOURCES = \
 	eglapi.c \
-	eglapi.h \
 	eglarray.c \
-	eglarray.h \
-	eglcompiler.h \
 	eglconfig.c \
-	eglconfig.h \
 	eglcontext.c \
-	eglcontext.h \
 	eglcurrent.c \
-	eglcurrent.h \
-	egldefines.h \
 	egldisplay.c \
-	egldisplay.h \
 	egldriver.c \
-	egldriver.h \
 	eglfallbacks.c \
 	eglglobals.c \
-	eglglobals.h \
 	eglimage.c \
-	eglimage.h \
 	egllog.c \
-	egllog.h \
 	eglmisc.c \
-	eglmisc.h \
 	eglmode.c \
+	eglscreen.c \
+	eglstring.c \
+	eglsurface.c \
+	eglsync.c \
+	eglcompiler.h \
+	eglconfig.h \
+	eglcontext.h \
+	eglcurrent.h \
+	egldefines.h \
+	egldisplay.h \
+	egldriver.h \
+	eglglobals.h \
+	eglimage.h \
+	egllog.h \
+	eglmisc.h \
 	eglmode.h \
 	eglmutex.h \
-	eglscreen.c \
 	eglscreen.h \
-	eglstring.c \
 	eglstring.h \
-	eglsurface.c \
 	eglsurface.h \
-	eglsync.c \
-	eglsync.h \
-	egltypedefs.h
+	eglsync.h
 
 libEGL_la_LIBADD = \
 	$(EGL_LIB_DEPS)
-libEGL_la_LDFLAGS = \
-	-no-undefined \
-	-version-number 1:0 \
-	-Wl,-Bsymbolic \
-	$(GC_SECTIONS) \
-	$(LD_NO_UNDEFINED)
+libEGL_la_LDFLAGS = -version-number 1:0 -no-undefined
 
 if HAVE_EGL_PLATFORM_X11
 AM_CFLAGS += -DHAVE_X11_PLATFORM
@@ -106,14 +104,25 @@ if HAVE_EGL_PLATFORM_NULL
 AM_CFLAGS += -DHAVE_NULL_PLATFORM
 endif
 
+if HAVE_EGL_DRIVER_GLX
+AM_CFLAGS += -D_EGL_BUILT_IN_DRIVER_GLX
+libEGL_la_LIBADD += ../drivers/glx/libegl_glx.la
+libEGL_la_LIBADD += $(X11_LIBS) $(DLOPEN_LIBS)
+endif
+
 if HAVE_EGL_DRIVER_DRI2
 AM_CFLAGS += -D_EGL_BUILT_IN_DRIVER_DRI2
 AM_CFLAGS += -DHAVE_XCB_DRI2
 libEGL_la_LIBADD += ../drivers/dri2/libegl_dri2.la
-libEGL_la_LIBADD += $(DLOPEN_LIBS) $(LIBDRM_LIBS)
+libEGL_la_LIBADD += $(LIBUDEV_LIBS) $(DLOPEN_LIBS) $(LIBDRM_LIBS)
 endif
 
-include $(top_srcdir)/install-lib-links.mk
+# Provide compatibility with scripts for the old Mesa build system for
+# a while by putting a link to the driver into /lib of the build tree.
+all-local: libEGL.la
+	$(MKDIR_P) $(top_builddir)/$(LIB_DIR);
+	ln -f .libs/libEGL.so.1.0.0 $(top_builddir)/$(LIB_DIR)/libEGL.so.1
+	ln -sf libEGL.so.1 $(top_builddir)/$(LIB_DIR)/libEGL.so
 
 pkgconfigdir = $(libdir)/pkgconfig
 

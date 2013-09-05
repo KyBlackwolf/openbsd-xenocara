@@ -22,168 +22,142 @@
 
 #include "core/kernel.hpp"
 #include "core/resource.hpp"
-#include "util/factor.hpp"
 #include "util/u_math.h"
 #include "pipe/p_context.h"
 
 using namespace clover;
 
-kernel::kernel(clover::program &prog, const std::string &name,
-               const std::vector<module::argument> &margs) :
-   program(prog), _name(name), exec(*this) {
-   for (auto &marg : margs) {
+_cl_kernel::_cl_kernel(clover::program &prog,
+                       const std::string &name,
+                       const std::vector<clover::module::argument> &margs) :
+   prog(prog), __name(name), exec(*this) {
+   for (auto marg : margs) {
       if (marg.type == module::argument::scalar)
-         _args.emplace_back(new scalar_argument(marg.size));
+         args.emplace_back(new scalar_argument(marg.size));
       else if (marg.type == module::argument::global)
-         _args.emplace_back(new global_argument);
+         args.emplace_back(new global_argument);
       else if (marg.type == module::argument::local)
-         _args.emplace_back(new local_argument);
+         args.emplace_back(new local_argument);
       else if (marg.type == module::argument::constant)
-         _args.emplace_back(new constant_argument);
+         args.emplace_back(new constant_argument);
       else if (marg.type == module::argument::image2d_rd ||
                marg.type == module::argument::image3d_rd)
-         _args.emplace_back(new image_rd_argument);
+         args.emplace_back(new image_rd_argument);
       else if (marg.type == module::argument::image2d_wr ||
                marg.type == module::argument::image3d_wr)
-         _args.emplace_back(new image_wr_argument);
+         args.emplace_back(new image_wr_argument);
       else if (marg.type == module::argument::sampler)
-         _args.emplace_back(new sampler_argument);
+         args.emplace_back(new sampler_argument);
       else
          throw error(CL_INVALID_KERNEL_DEFINITION);
    }
 }
 
-template<typename V>
-static inline std::vector<uint>
-pad_vector(command_queue &q, const V &v, uint x) {
-   std::vector<uint> w { v.begin(), v.end() };
-   w.resize(q.device().max_block_size().size(), x);
+template<typename T, typename V>
+static inline std::vector<T>
+pad_vector(clover::command_queue &q, const V &v, T x) {
+   std::vector<T> w { v.begin(), v.end() };
+   w.resize(q.dev.max_block_size().size(), x);
    return w;
 }
 
 void
-kernel::launch(command_queue &q,
-               const std::vector<size_t> &grid_offset,
-               const std::vector<size_t> &grid_size,
-               const std::vector<size_t> &block_size) {
-   const auto m = program().binary(q.device());
-   const auto reduced_grid_size =
-      map(divides(), grid_size, block_size);
+_cl_kernel::launch(clover::command_queue &q,
+                   const std::vector<size_t> &grid_offset,
+                   const std::vector<size_t> &grid_size,
+                   const std::vector<size_t> &block_size) {
    void *st = exec.bind(&q);
-
-   // The handles are created during exec_context::bind(), so we need make
-   // sure to call exec_context::bind() before retrieving them.
-   std::vector<uint32_t *> g_handles = map([&](size_t h) {
-         return (uint32_t *)&exec.input[h];
-      }, exec.g_handles);
+   auto g_handles = map([&](size_t h) { return (uint32_t *)&exec.input[h]; },
+                        exec.g_handles.begin(), exec.g_handles.end());
 
    q.pipe->bind_compute_state(q.pipe, st);
-   q.pipe->bind_sampler_states(q.pipe, PIPE_SHADER_COMPUTE,
-                               0, exec.samplers.size(),
-                               exec.samplers.data());
-
-   q.pipe->set_sampler_views(q.pipe, PIPE_SHADER_COMPUTE, 0,
-                             exec.sviews.size(), exec.sviews.data());
+   q.pipe->bind_compute_sampler_states(q.pipe, 0, exec.samplers.size(),
+                                       exec.samplers.data());
+   q.pipe->set_compute_sampler_views(q.pipe, 0, exec.sviews.size(),
+                                     exec.sviews.data());
    q.pipe->set_compute_resources(q.pipe, 0, exec.resources.size(),
-                                 exec.resources.data());
+                                     exec.resources.data());
    q.pipe->set_global_binding(q.pipe, 0, exec.g_buffers.size(),
                               exec.g_buffers.data(), g_handles.data());
 
    q.pipe->launch_grid(q.pipe,
-                       pad_vector(q, block_size, 1).data(),
-                       pad_vector(q, reduced_grid_size, 1).data(),
-                       find(name_equals(_name), m.syms).offset,
+                       pad_vector<uint>(q, block_size, 1).data(),
+                       pad_vector<uint>(q, grid_size, 1).data(),
+                       module(q).sym(__name).offset,
                        exec.input.data());
 
    q.pipe->set_global_binding(q.pipe, 0, exec.g_buffers.size(), NULL, NULL);
    q.pipe->set_compute_resources(q.pipe, 0, exec.resources.size(), NULL);
-   q.pipe->set_sampler_views(q.pipe, PIPE_SHADER_COMPUTE, 0,
-                             exec.sviews.size(), NULL);
-   q.pipe->bind_sampler_states(q.pipe, PIPE_SHADER_COMPUTE, 0,
-                               exec.samplers.size(), NULL);
+   q.pipe->set_compute_sampler_views(q.pipe, 0, exec.sviews.size(), NULL);
+   q.pipe->bind_compute_sampler_states(q.pipe, 0, exec.samplers.size(), NULL);
    exec.unbind();
 }
 
 size_t
-kernel::mem_local() const {
+_cl_kernel::mem_local() const {
    size_t sz = 0;
 
-   for (auto &arg : args()) {
-      if (dynamic_cast<local_argument *>(&arg))
-         sz += arg.storage();
+   for (auto &arg : args) {
+      if (dynamic_cast<local_argument *>(arg.get()))
+         sz += arg->storage();
    }
 
    return sz;
 }
 
 size_t
-kernel::mem_private() const {
+_cl_kernel::mem_private() const {
    return 0;
 }
 
+size_t
+_cl_kernel::max_block_size() const {
+   return SIZE_MAX;
+}
+
 const std::string &
-kernel::name() const {
-   return _name;
+_cl_kernel::name() const {
+   return __name;
 }
 
 std::vector<size_t>
-kernel::optimal_block_size(const command_queue &q,
-                           const std::vector<size_t> &grid_size) const {
-   return factor::find_grid_optimal_factor<size_t>(
-      q.device().max_threads_per_block(), q.device().max_block_size(),
-      grid_size);
-}
-
-std::vector<size_t>
-kernel::required_block_size() const {
+_cl_kernel::block_size() const {
    return { 0, 0, 0 };
 }
 
-kernel::argument_range
-kernel::args() {
-   return map(derefs(), _args);
+const clover::module &
+_cl_kernel::module(const clover::command_queue &q) const {
+   return prog.binaries().find(&q.dev)->second;
 }
 
-kernel::const_argument_range
-kernel::args() const {
-   return map(derefs(), _args);
+_cl_kernel::exec_context::exec_context(clover::kernel &kern) :
+   kern(kern), q(NULL), mem_local(0), st(NULL) {
 }
 
-const module &
-kernel::module(const command_queue &q) const {
-   return program().binary(q.device());
-}
-
-kernel::exec_context::exec_context(kernel &kern) :
-   kern(kern), q(NULL), mem_local(0), st(NULL), cs() {
-}
-
-kernel::exec_context::~exec_context() {
+_cl_kernel::exec_context::~exec_context() {
    if (st)
       q->pipe->delete_compute_state(q->pipe, st);
 }
 
 void *
-kernel::exec_context::bind(intrusive_ptr<command_queue> _q) {
-   std::swap(q, _q);
+_cl_kernel::exec_context::bind(clover::command_queue *__q) {
+   std::swap(q, __q);
 
    // Bind kernel arguments.
-   auto &m = kern.program().binary(q->device());
-   auto margs = find(name_equals(kern.name()), m.syms).args;
-   auto msec = find(type_equals(module::section::text), m.secs);
-
-   for_each([=](kernel::argument &karg, const module::argument &marg) {
-               karg.bind(*this, marg);
-            }, kern.args(), margs);
+   auto margs = kern.module(*q).sym(kern.name()).args;
+   for_each([=](std::unique_ptr<kernel::argument> &karg,
+                const module::argument &marg) {
+         karg->bind(*this, marg);
+      }, kern.args.begin(), kern.args.end(), margs.begin());
 
    // Create a new compute state if anything changed.
-   if (!st || q != _q ||
+   if (!st || q != __q ||
        cs.req_local_mem != mem_local ||
        cs.req_input_mem != input.size()) {
       if (st)
-         _q->pipe->delete_compute_state(_q->pipe, st);
+         __q->pipe->delete_compute_state(__q->pipe, st);
 
-      cs.prog = msec.data.begin();
+      cs.prog = kern.module(*q).sec(module::section::text).data.begin();
       cs.req_local_mem = mem_local;
       cs.req_input_mem = input.size();
       st = q->pipe->create_compute_state(q->pipe, &cs);
@@ -193,9 +167,9 @@ kernel::exec_context::bind(intrusive_ptr<command_queue> _q) {
 }
 
 void
-kernel::exec_context::unbind() {
-   for (auto &arg : kern.args())
-      arg.unbind(*this);
+_cl_kernel::exec_context::unbind() {
+   for (auto &arg : kern.args)
+      arg->unbind(*this);
 
    input.clear();
    samplers.clear();
@@ -247,7 +221,7 @@ namespace {
    ///
    template<typename T>
    void
-   extend(T &v, enum module::argument::ext_type ext, size_t n) {
+   extend(T &v, enum clover::module::argument::ext_type ext, size_t n) {
       const size_t m = std::min(v.size(), n);
       const bool sign_ext = (ext == module::argument::sign_ext);
       const uint8_t fill = (sign_ext && msb(v) ? ~0 : 0);
@@ -282,222 +256,211 @@ namespace {
    }
 }
 
-kernel::argument::argument() : _set(false) {
+_cl_kernel::argument::argument() : __set(false) {
 }
 
 bool
-kernel::argument::set() const {
-   return _set;
+_cl_kernel::argument::set() const {
+   return __set;
 }
 
 size_t
-kernel::argument::storage() const {
+_cl_kernel::argument::storage() const {
    return 0;
 }
 
-kernel::scalar_argument::scalar_argument(size_t size) : size(size) {
+_cl_kernel::scalar_argument::scalar_argument(size_t size) : size(size) {
 }
 
 void
-kernel::scalar_argument::set(size_t size, const void *value) {
+_cl_kernel::scalar_argument::set(size_t size, const void *value) {
    if (size != this->size)
       throw error(CL_INVALID_ARG_SIZE);
 
    v = { (uint8_t *)value, (uint8_t *)value + size };
-   _set = true;
+   __set = true;
 }
 
 void
-kernel::scalar_argument::bind(exec_context &ctx,
-                              const module::argument &marg) {
+_cl_kernel::scalar_argument::bind(exec_context &ctx,
+                                  const clover::module::argument &marg) {
    auto w = v;
 
    extend(w, marg.ext_type, marg.target_size);
-   byteswap(w, ctx.q->device().endianness());
+   byteswap(w, ctx.q->dev.endianness());
    align(ctx.input, marg.target_align);
    insert(ctx.input, w);
 }
 
 void
-kernel::scalar_argument::unbind(exec_context &ctx) {
+_cl_kernel::scalar_argument::unbind(exec_context &ctx) {
 }
 
 void
-kernel::global_argument::set(size_t size, const void *value) {
+_cl_kernel::global_argument::set(size_t size, const void *value) {
    if (size != sizeof(cl_mem))
       throw error(CL_INVALID_ARG_SIZE);
 
-   buf = pobj<buffer>(value ? *(cl_mem *)value : NULL);
-   _set = true;
+   obj = dynamic_cast<clover::buffer *>(*(cl_mem *)value);
+   if (!obj)
+      throw error(CL_INVALID_MEM_OBJECT);
+
+   __set = true;
 }
 
 void
-kernel::global_argument::bind(exec_context &ctx,
-                              const module::argument &marg) {
+_cl_kernel::global_argument::bind(exec_context &ctx,
+                                  const clover::module::argument &marg) {
    align(ctx.input, marg.target_align);
-
-   if (buf) {
-      const resource &r = buf->resource(*ctx.q);
-      ctx.g_handles.push_back(ctx.input.size());
-      ctx.g_buffers.push_back(r.pipe);
-
-      // How to handle multi-demensional offsets?
-      // We don't need to.  Buffer offsets are always
-      // one-dimensional.
-      auto v = bytes(r.offset[0]);
-      extend(v, marg.ext_type, marg.target_size);
-      byteswap(v, ctx.q->device().endianness());
-      insert(ctx.input, v);
-   } else {
-      // Null pointer.
-      allocate(ctx.input, marg.target_size);
-   }
+   ctx.g_handles.push_back(allocate(ctx.input, marg.target_size));
+   ctx.g_buffers.push_back(obj->resource(ctx.q).pipe);
 }
 
 void
-kernel::global_argument::unbind(exec_context &ctx) {
+_cl_kernel::global_argument::unbind(exec_context &ctx) {
 }
 
 size_t
-kernel::local_argument::storage() const {
-   return _storage;
+_cl_kernel::local_argument::storage() const {
+   return __storage;
 }
 
 void
-kernel::local_argument::set(size_t size, const void *value) {
+_cl_kernel::local_argument::set(size_t size, const void *value) {
    if (value)
       throw error(CL_INVALID_ARG_VALUE);
 
-   _storage = size;
-   _set = true;
+   __storage = size;
+   __set = true;
 }
 
 void
-kernel::local_argument::bind(exec_context &ctx,
-                             const module::argument &marg) {
+_cl_kernel::local_argument::bind(exec_context &ctx,
+                                 const clover::module::argument &marg) {
    auto v = bytes(ctx.mem_local);
 
    extend(v, module::argument::zero_ext, marg.target_size);
-   byteswap(v, ctx.q->device().endianness());
+   byteswap(v, ctx.q->dev.endianness());
    align(ctx.input, marg.target_align);
    insert(ctx.input, v);
 
-   ctx.mem_local += _storage;
+   ctx.mem_local += __storage;
 }
 
 void
-kernel::local_argument::unbind(exec_context &ctx) {
+_cl_kernel::local_argument::unbind(exec_context &ctx) {
 }
 
 void
-kernel::constant_argument::set(size_t size, const void *value) {
+_cl_kernel::constant_argument::set(size_t size, const void *value) {
    if (size != sizeof(cl_mem))
       throw error(CL_INVALID_ARG_SIZE);
 
-   buf = pobj<buffer>(value ? *(cl_mem *)value : NULL);
-   _set = true;
+   obj = dynamic_cast<clover::buffer *>(*(cl_mem *)value);
+   if (!obj)
+      throw error(CL_INVALID_MEM_OBJECT);
+
+   __set = true;
 }
 
 void
-kernel::constant_argument::bind(exec_context &ctx,
-                                const module::argument &marg) {
-   align(ctx.input, marg.target_align);
-
-   if (buf) {
-      resource &r = buf->resource(*ctx.q);
-      auto v = bytes(ctx.resources.size() << 24 | r.offset[0]);
-
-      extend(v, module::argument::zero_ext, marg.target_size);
-      byteswap(v, ctx.q->device().endianness());
-      insert(ctx.input, v);
-
-      st = r.bind_surface(*ctx.q, false);
-      ctx.resources.push_back(st);
-   } else {
-      // Null pointer.
-      allocate(ctx.input, marg.target_size);
-   }
-}
-
-void
-kernel::constant_argument::unbind(exec_context &ctx) {
-   if (buf)
-      buf->resource(*ctx.q).unbind_surface(*ctx.q, st);
-}
-
-void
-kernel::image_rd_argument::set(size_t size, const void *value) {
-   if (size != sizeof(cl_mem))
-      throw error(CL_INVALID_ARG_SIZE);
-
-   img = &obj<image>(*(cl_mem *)value);
-   _set = true;
-}
-
-void
-kernel::image_rd_argument::bind(exec_context &ctx,
-                                const module::argument &marg) {
-   auto v = bytes(ctx.sviews.size());
+_cl_kernel::constant_argument::bind(exec_context &ctx,
+                                    const clover::module::argument &marg) {
+   auto v = bytes(ctx.resources.size() << 24);
 
    extend(v, module::argument::zero_ext, marg.target_size);
-   byteswap(v, ctx.q->device().endianness());
+   byteswap(v, ctx.q->dev.endianness());
    align(ctx.input, marg.target_align);
    insert(ctx.input, v);
 
-   st = img->resource(*ctx.q).bind_sampler_view(*ctx.q);
-   ctx.sviews.push_back(st);
-}
-
-void
-kernel::image_rd_argument::unbind(exec_context &ctx) {
-   img->resource(*ctx.q).unbind_sampler_view(*ctx.q, st);
-}
-
-void
-kernel::image_wr_argument::set(size_t size, const void *value) {
-   if (size != sizeof(cl_mem))
-      throw error(CL_INVALID_ARG_SIZE);
-
-   img = &obj<image>(*(cl_mem *)value);
-   _set = true;
-}
-
-void
-kernel::image_wr_argument::bind(exec_context &ctx,
-                                const module::argument &marg) {
-   auto v = bytes(ctx.resources.size());
-
-   extend(v, module::argument::zero_ext, marg.target_size);
-   byteswap(v, ctx.q->device().endianness());
-   align(ctx.input, marg.target_align);
-   insert(ctx.input, v);
-
-   st = img->resource(*ctx.q).bind_surface(*ctx.q, true);
+   st = obj->resource(ctx.q).bind_surface(*ctx.q, false);
    ctx.resources.push_back(st);
 }
 
 void
-kernel::image_wr_argument::unbind(exec_context &ctx) {
-   img->resource(*ctx.q).unbind_surface(*ctx.q, st);
+_cl_kernel::constant_argument::unbind(exec_context &ctx) {
+   obj->resource(ctx.q).unbind_surface(*ctx.q, st);
 }
 
 void
-kernel::sampler_argument::set(size_t size, const void *value) {
+_cl_kernel::image_rd_argument::set(size_t size, const void *value) {
+   if (size != sizeof(cl_mem))
+      throw error(CL_INVALID_ARG_SIZE);
+
+   obj = dynamic_cast<clover::image *>(*(cl_mem *)value);
+   if (!obj)
+      throw error(CL_INVALID_MEM_OBJECT);
+
+   __set = true;
+}
+
+void
+_cl_kernel::image_rd_argument::bind(exec_context &ctx,
+                                    const clover::module::argument &marg) {
+   auto v = bytes(ctx.sviews.size());
+
+   extend(v, module::argument::zero_ext, marg.target_size);
+   byteswap(v, ctx.q->dev.endianness());
+   align(ctx.input, marg.target_align);
+   insert(ctx.input, v);
+
+   st = obj->resource(ctx.q).bind_sampler_view(*ctx.q);
+   ctx.sviews.push_back(st);
+}
+
+void
+_cl_kernel::image_rd_argument::unbind(exec_context &ctx) {
+   obj->resource(ctx.q).unbind_sampler_view(*ctx.q, st);
+}
+
+void
+_cl_kernel::image_wr_argument::set(size_t size, const void *value) {
+   if (size != sizeof(cl_mem))
+      throw error(CL_INVALID_ARG_SIZE);
+
+   obj = dynamic_cast<clover::image *>(*(cl_mem *)value);
+   if (!obj)
+      throw error(CL_INVALID_MEM_OBJECT);
+
+   __set = true;
+}
+
+void
+_cl_kernel::image_wr_argument::bind(exec_context &ctx,
+                                    const clover::module::argument &marg) {
+   auto v = bytes(ctx.resources.size());
+
+   extend(v, module::argument::zero_ext, marg.target_size);
+   byteswap(v, ctx.q->dev.endianness());
+   align(ctx.input, marg.target_align);
+   insert(ctx.input, v);
+
+   st = obj->resource(ctx.q).bind_surface(*ctx.q, true);
+   ctx.resources.push_back(st);
+}
+
+void
+_cl_kernel::image_wr_argument::unbind(exec_context &ctx) {
+   obj->resource(ctx.q).unbind_surface(*ctx.q, st);
+}
+
+void
+_cl_kernel::sampler_argument::set(size_t size, const void *value) {
    if (size != sizeof(cl_sampler))
       throw error(CL_INVALID_ARG_SIZE);
 
-   s = &obj(*(cl_sampler *)value);
-   _set = true;
+   obj = *(cl_sampler *)value;
+   __set = true;
 }
 
 void
-kernel::sampler_argument::bind(exec_context &ctx,
-                               const module::argument &marg) {
-   st = s->bind(*ctx.q);
+_cl_kernel::sampler_argument::bind(exec_context &ctx,
+                                   const clover::module::argument &marg) {
+   st = obj->bind(*ctx.q);
    ctx.samplers.push_back(st);
 }
 
 void
-kernel::sampler_argument::unbind(exec_context &ctx) {
-   s->unbind(*ctx.q, st);
+_cl_kernel::sampler_argument::unbind(exec_context &ctx) {
+   obj->unbind(*ctx.q, st);
 }

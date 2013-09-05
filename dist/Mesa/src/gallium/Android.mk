@@ -34,11 +34,6 @@ SUBDIRS := \
 # swrast
 SUBDIRS += winsys/sw/android drivers/softpipe
 
-# freedreno
-ifneq ($(filter freedreno, $(MESA_GPU_DRIVERS)),)
-SUBDIRS += winsys/freedreno/drm drivers/freedreno
-endif
-
 # i915g
 ifneq ($(filter i915g, $(MESA_GPU_DRIVERS)),)
 SUBDIRS += winsys/i915/drm drivers/i915
@@ -53,7 +48,10 @@ endif
 ifneq ($(filter nouveau, $(MESA_GPU_DRIVERS)),)
 SUBDIRS += \
 	winsys/nouveau/drm \
-	drivers/nouveau
+	drivers/nouveau \
+	drivers/nvfx \
+	drivers/nv50 \
+	drivers/nvc0
 endif
 
 # r300g/r600g/radeonsi
@@ -62,14 +60,11 @@ SUBDIRS += winsys/radeon/drm
 ifneq ($(filter r300g, $(MESA_GPU_DRIVERS)),)
 SUBDIRS += drivers/r300
 endif
-ifneq ($(filter r600g radeonsi, $(MESA_GPU_DRIVERS)),)
-SUBDIRS += drivers/radeon
 ifneq ($(filter r600g, $(MESA_GPU_DRIVERS)),)
 SUBDIRS += drivers/r600
 endif
 ifneq ($(filter radeonsi, $(MESA_GPU_DRIVERS)),)
 SUBDIRS += drivers/radeonsi
-endif
 endif
 endif
 

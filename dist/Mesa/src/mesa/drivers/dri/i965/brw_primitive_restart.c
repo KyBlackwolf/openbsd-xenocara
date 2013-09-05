@@ -92,17 +92,13 @@ can_cut_index_handle_prims(struct gl_context *ctx,
       return false;
    }
 
-   for (int i = 0; i < nr_prims; i++) {
-      switch (prim[i].mode) {
+   for ( ; nr_prims > 0; nr_prims--) {
+      switch(prim->mode) {
       case GL_POINTS:
       case GL_LINES:
       case GL_LINE_STRIP:
       case GL_TRIANGLES:
       case GL_TRIANGLE_STRIP:
-      case GL_LINES_ADJACENCY:
-      case GL_LINE_STRIP_ADJACENCY:
-      case GL_TRIANGLES_ADJACENCY:
-      case GL_TRIANGLE_STRIP_ADJACENCY:
          /* Cut index supports these primitive types */
          break;
       default:
@@ -127,10 +123,9 @@ can_cut_index_handle_prims(struct gl_context *ctx,
  */
 GLboolean
 brw_handle_primitive_restart(struct gl_context *ctx,
-                             const struct _mesa_prim *prims,
+                             const struct _mesa_prim *prim,
                              GLuint nr_prims,
-                             const struct _mesa_index_buffer *ib,
-                             struct gl_buffer_object *indirect)
+                             const struct _mesa_index_buffer *ib)
 {
    struct brw_context *brw = brw_context(ctx);
 
@@ -166,17 +161,17 @@ brw_handle_primitive_restart(struct gl_context *ctx,
     */
    brw->prim_restart.in_progress = true;
 
-   if (can_cut_index_handle_prims(ctx, prims, nr_prims, ib)) {
+   if (can_cut_index_handle_prims(ctx, prim, nr_prims, ib)) {
       /* Cut index should work for primitive restart, so use it
        */
       brw->prim_restart.enable_cut_index = true;
-      brw_draw_prims(ctx, prims, nr_prims, ib, GL_FALSE, -1, -1, NULL, indirect);
+      brw_draw_prims(ctx, prim, nr_prims, ib, GL_FALSE, -1, -1, NULL);
       brw->prim_restart.enable_cut_index = false;
    } else {
       /* Not all the primitive draw modes are supported by the cut index,
        * so take the software path
        */
-      vbo_sw_primitive_restart(ctx, prims, nr_prims, ib, indirect);
+      vbo_sw_primitive_restart(ctx, prim, nr_prims, ib);
    }
 
    brw->prim_restart.in_progress = false;
@@ -191,7 +186,7 @@ haswell_upload_cut_index(struct brw_context *brw)
    struct gl_context *ctx = &brw->ctx;
 
    /* Don't trigger on Ivybridge */
-   if (brw->gen < 8 && !brw->is_haswell)
+   if (!brw->is_haswell)
       return;
 
    const unsigned cut_index_setting =

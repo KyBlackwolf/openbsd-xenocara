@@ -25,73 +25,66 @@
 
 using namespace clover;
 
-CLOVER_API cl_sampler
-clCreateSampler(cl_context d_ctx, cl_bool norm_mode,
+PUBLIC cl_sampler
+clCreateSampler(cl_context ctx, cl_bool norm_mode,
                 cl_addressing_mode addr_mode, cl_filter_mode filter_mode,
-                cl_int *r_errcode) try {
-   auto &ctx = obj(d_ctx);
+                cl_int *errcode_ret) try {
+   if (!ctx)
+      throw error(CL_INVALID_CONTEXT);
 
-   ret_error(r_errcode, CL_SUCCESS);
-   return new sampler(ctx, norm_mode, addr_mode, filter_mode);
+   ret_error(errcode_ret, CL_SUCCESS);
+   return new sampler(*ctx, norm_mode, addr_mode, filter_mode);
 
 } catch (error &e) {
-   ret_error(r_errcode, e);
+   ret_error(errcode_ret, e);
    return NULL;
 }
 
-CLOVER_API cl_int
-clRetainSampler(cl_sampler d_s) try {
-   obj(d_s).retain();
-   return CL_SUCCESS;
+PUBLIC cl_int
+clRetainSampler(cl_sampler s) {
+   if (!s)
+      throw error(CL_INVALID_SAMPLER);
 
-} catch (error &e) {
-   return e.get();
+   s->retain();
+   return CL_SUCCESS;
 }
 
-CLOVER_API cl_int
-clReleaseSampler(cl_sampler d_s) try {
-   if (obj(d_s).release())
-      delete pobj(d_s);
+PUBLIC cl_int
+clReleaseSampler(cl_sampler s) {
+   if (!s)
+      throw error(CL_INVALID_SAMPLER);
+
+   if (s->release())
+      delete s;
 
    return CL_SUCCESS;
-
-} catch (error &e) {
-   return e.get();
 }
 
-CLOVER_API cl_int
-clGetSamplerInfo(cl_sampler d_s, cl_sampler_info param,
-                 size_t size, void *r_buf, size_t *r_size) try {
-   property_buffer buf { r_buf, size, r_size };
-   auto &s = obj(d_s);
+PUBLIC cl_int
+clGetSamplerInfo(cl_sampler s, cl_sampler_info param,
+                 size_t size, void *buf, size_t *size_ret) {
+   if (!s)
+      throw error(CL_INVALID_SAMPLER);
 
    switch (param) {
    case CL_SAMPLER_REFERENCE_COUNT:
-      buf.as_scalar<cl_uint>() = s.ref_count();
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, s->ref_count());
 
    case CL_SAMPLER_CONTEXT:
-      buf.as_scalar<cl_context>() = desc(s.context());
-      break;
+      return scalar_property<cl_context>(buf, size, size_ret, &s->ctx);
 
    case CL_SAMPLER_NORMALIZED_COORDS:
-      buf.as_scalar<cl_bool>() = s.norm_mode();
-      break;
+      return scalar_property<cl_bool>(buf, size, size_ret, s->norm_mode());
 
    case CL_SAMPLER_ADDRESSING_MODE:
-      buf.as_scalar<cl_addressing_mode>() = s.addr_mode();
-      break;
+      return scalar_property<cl_addressing_mode>(buf, size, size_ret,
+                                                 s->addr_mode());
 
    case CL_SAMPLER_FILTER_MODE:
-      buf.as_scalar<cl_filter_mode>() = s.filter_mode();
-      break;
+      return scalar_property<cl_filter_mode>(buf, size, size_ret,
+                                             s->filter_mode());
 
    default:
-      throw error(CL_INVALID_VALUE);
+      return CL_INVALID_VALUE;
    }
-
-   return CL_SUCCESS;
-
-} catch (error &e) {
-   return e.get();
 }

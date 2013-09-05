@@ -23,7 +23,6 @@
 
 #include <gtest/gtest.h>
 #include "brw_vec4.h"
-#include "brw_vs.h"
 
 using namespace brw;
 
@@ -48,10 +47,8 @@ class register_coalesce_vec4_visitor : public vec4_visitor
 public:
    register_coalesce_vec4_visitor(struct brw_context *brw,
                                   struct gl_shader_program *shader_prog)
-      : vec4_visitor(brw, NULL, NULL, NULL, NULL, shader_prog,
-                     MESA_SHADER_VERTEX, NULL,
-                     false, false /* no_spills */,
-                     ST_NONE, ST_NONE, ST_NONE)
+      : vec4_visitor(brw, NULL, NULL, NULL, NULL, shader_prog, NULL, NULL,
+                     false)
    {
    }
 
@@ -62,9 +59,10 @@ protected:
       return NULL;
    }
 
-   virtual void setup_payload()
+   virtual int setup_attributes(int payload_reg)
    {
       assert(!"Not reached");
+      return 0;
    }
 
    virtual void emit_prolog()
@@ -90,7 +88,6 @@ protected:
    virtual vec4_instruction *emit_urb_write_opcode(bool complete)
    {
       assert(!"Not reached");
-      unreachable();
    }
 };
 

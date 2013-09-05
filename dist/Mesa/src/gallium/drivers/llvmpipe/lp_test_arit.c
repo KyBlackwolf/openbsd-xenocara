@@ -108,7 +108,6 @@ static float sgnf(float x)
 
 
 const float exp2_values[] = {
-   -INFINITY,
    -60,
    -4,
    -2,
@@ -123,9 +122,7 @@ const float exp2_values[] = {
    1, 
    2, 
    4, 
-   60,
-   INFINITY,
-   NAN
+   60
 };
 
 
@@ -137,8 +134,6 @@ const float log2_values[] = {
     */
    1.4012984643248171e-45,
 #endif
-   -INFINITY,
-   0,
    1e-007,
    0.1,
    0.5,
@@ -151,9 +146,7 @@ const float log2_values[] = {
    2,
    4,
    100000,
-   1e+018,
-   INFINITY,
-   NAN
+   1e+018
 };
 
 
@@ -197,20 +190,17 @@ const float rsqrt_values[] = {
 
 
 const float sincos_values[] = {
-   -INFINITY,
    -5*M_PI/4,
    -4*M_PI/4,
    -4*M_PI/4,
    -3*M_PI/4,
    -2*M_PI/4,
    -1*M_PI/4,
-   1*M_PI/4,
-   2*M_PI/4,
-   3*M_PI/4,
-   4*M_PI/4,
-   5*M_PI/4,
-   INFINITY,
-   NAN
+    1*M_PI/4,
+    2*M_PI/4,
+    3*M_PI/4,
+    4*M_PI/4,
+    5*M_PI/4,
 };
 
 const float round_values[] = {
@@ -273,9 +263,9 @@ static const struct unary_test_t
 unary_tests[] = {
    {"neg", &lp_build_negate, &negf, exp2_values, Elements(exp2_values), 20.0 },
    {"exp2", &lp_build_exp2, &exp2f, exp2_values, Elements(exp2_values), 20.0 },
-   {"log2", &lp_build_log2_safe, &log2f, log2_values, Elements(log2_values), 20.0 },
+   {"log2", &lp_build_log2, &log2f, log2_values, Elements(log2_values), 20.0 },
    {"exp", &lp_build_exp, &expf, exp2_values, Elements(exp2_values), 18.0 },
-   {"log", &lp_build_log_safe, &logf, log2_values, Elements(log2_values), 20.0 },
+   {"log", &lp_build_log, &logf, log2_values, Elements(log2_values), 20.0 },
    {"rcp", &lp_build_rcp, &rcpf, rcp_values, Elements(rcp_values), 20.0 },
    {"rsqrt", &lp_build_rsqrt, &rsqrtf, rsqrt_values, Elements(rsqrt_values), 20.0 },
    {"sin", &lp_build_sin, &sinf, sincos_values, Elements(sincos_values), 20.0 },

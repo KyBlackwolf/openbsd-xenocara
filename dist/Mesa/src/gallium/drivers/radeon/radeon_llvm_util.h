@@ -29,11 +29,10 @@
 
 #include <llvm-c/Core.h>
 
-LLVMModuleRef radeon_llvm_parse_bitcode(LLVMContextRef ctx,
-			const unsigned char * bitcode, unsigned bitcode_len);
-unsigned radeon_llvm_get_num_kernels(LLVMContextRef ctx,
-			const unsigned char *bitcode, unsigned bitcode_len);
-LLVMModuleRef radeon_llvm_get_kernel_module(LLVMContextRef ctx, unsigned index,
+LLVMModuleRef radeon_llvm_parse_bitcode(const unsigned char * bitcode,
+							unsigned bitcode_len);
+unsigned radeon_llvm_get_num_kernels(const unsigned char *bitcode, unsigned bitcode_len);
+LLVMModuleRef radeon_llvm_get_kernel_module(unsigned index,
 			const unsigned char *bitcode, unsigned bitcode_len);
 
 #endif

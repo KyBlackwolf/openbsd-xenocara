@@ -1,6 +1,6 @@
 /**************************************************************************
  * 
- * Copyright 2006 VMware, Inc.
+ * Copyright 2006 Tungsten Graphics, Inc., Cedar Park, Texas.
  * All Rights Reserved.
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -18,7 +18,7 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
- * IN NO EVENT SHALL VMWARE AND/OR ITS SUPPLIERS BE LIABLE FOR
+ * IN NO EVENT SHALL TUNGSTEN GRAPHICS AND/OR ITS SUPPLIERS BE LIABLE FOR
  * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -165,10 +165,17 @@ intel_unmap_renderbuffer(struct gl_context *ctx,
    intel_miptree_unmap(intel, irb->mt, irb->mt_level, irb->mt_layer);
 }
 
-static mesa_format
-intel_renderbuffer_format(struct gl_context * ctx, GLenum internalFormat)
+/**
+ * Called via glRenderbufferStorageEXT() to set the format and allocate
+ * storage for a user-created renderbuffer.
+ */
+static GLboolean
+intel_alloc_renderbuffer_storage(struct gl_context * ctx, struct gl_renderbuffer *rb,
+                                 GLenum internalFormat,
+                                 GLuint width, GLuint height)
 {
    struct intel_context *intel = intel_context(ctx);
+   struct intel_renderbuffer *irb = intel_renderbuffer(rb);
 
    switch (internalFormat) {
    default:
@@ -177,28 +184,19 @@ intel_renderbuffer_format(struct gl_context * ctx, GLenum internalFormat)
        * except they're less useful because you can't texture with
        * them.
        */
-      return intel->ctx.Driver.ChooseTextureFormat(ctx, GL_TEXTURE_2D,
-                                                   internalFormat,
-                                                   GL_NONE, GL_NONE);
+      rb->Format = intel->ctx.Driver.ChooseTextureFormat(ctx, GL_TEXTURE_2D,
+							 internalFormat,
+							 GL_NONE, GL_NONE);
+      break;
    case GL_STENCIL_INDEX:
    case GL_STENCIL_INDEX1_EXT:
    case GL_STENCIL_INDEX4_EXT:
    case GL_STENCIL_INDEX8_EXT:
    case GL_STENCIL_INDEX16_EXT:
       /* These aren't actual texture formats, so force them here. */
-      return MESA_FORMAT_Z24_UNORM_S8_UINT;
+      rb->Format = MESA_FORMAT_S8_Z24;
+      break;
    }
-}
-
-static GLboolean
-intel_alloc_private_renderbuffer_storage(struct gl_context * ctx, struct gl_renderbuffer *rb,
-                                         GLenum internalFormat,
-                                         GLuint width, GLuint height)
-{
-   struct intel_context *intel = intel_context(ctx);
-   struct intel_renderbuffer *irb = intel_renderbuffer(rb);
-
-   assert(rb->Format != MESA_FORMAT_NONE);
 
    rb->Width = width;
    rb->Height = height;
@@ -221,18 +219,6 @@ intel_alloc_private_renderbuffer_storage(struct gl_context * ctx, struct gl_rend
    return true;
 }
 
-/**
- * Called via glRenderbufferStorageEXT() to set the format and allocate
- * storage for a user-created renderbuffer.
- */
-static GLboolean
-intel_alloc_renderbuffer_storage(struct gl_context * ctx, struct gl_renderbuffer *rb,
-                                 GLenum internalFormat,
-                                 GLuint width, GLuint height)
-{
-   rb->Format = intel_renderbuffer_format(ctx, internalFormat);
-   return intel_alloc_private_renderbuffer_storage(ctx, rb, internalFormat, width, height);
-}
 
 static void
 intel_image_target_renderbuffer_storage(struct gl_context *ctx,
@@ -252,7 +238,7 @@ intel_image_target_renderbuffer_storage(struct gl_context *ctx,
 
    /* __DRIimage is opaque to the core so it has to be checked here */
    switch (image->format) {
-   case MESA_FORMAT_R8G8B8A8_UNORM:
+   case MESA_FORMAT_RGBA8888_REV:
       _mesa_error(&intel->ctx, GL_INVALID_OPERATION,
             "glEGLImageTargetRenderbufferStorage(unsupported image format");
       return;
@@ -317,7 +303,7 @@ intel_nop_alloc_storage(struct gl_context * ctx, struct gl_renderbuffer *rb,
  * not a user-created renderbuffer.
  */
 struct intel_renderbuffer *
-intel_create_renderbuffer(mesa_format format)
+intel_create_renderbuffer(gl_format format)
 {
    struct intel_renderbuffer *irb;
    struct gl_renderbuffer *rb;
@@ -352,12 +338,12 @@ intel_create_renderbuffer(mesa_format format)
  * may be called at intel_update_renderbuffers() time.
  */
 struct intel_renderbuffer *
-intel_create_private_renderbuffer(mesa_format format)
+intel_create_private_renderbuffer(gl_format format)
 {
    struct intel_renderbuffer *irb;
 
    irb = intel_create_renderbuffer(format);
-   irb->Base.Base.AllocStorage = intel_alloc_private_renderbuffer_storage;
+   irb->Base.Base.AllocStorage = intel_alloc_renderbuffer_storage;
 
    return irb;
 }
@@ -433,6 +419,8 @@ intel_renderbuffer_update_wrapper(struct intel_context *intel,
    struct intel_texture_image *intel_image = intel_texture_image(image);
    struct intel_mipmap_tree *mt = intel_image->mt;
    int level = image->Level;
+
+   rb->Depth = image->Depth;
 
    rb->AllocStorage = intel_nop_alloc_storage;
 
@@ -672,7 +660,7 @@ intel_blit_framebuffer_with_blitter(struct gl_context *ctx,
             srcY0 >= 0 && srcY1 <= readFb->Height &&
             dstX0 >= 0 && dstX1 <= drawFb->Width &&
             dstY0 >= 0 && dstY1 <= drawFb->Height &&
-            !ctx->Scissor.EnableFlags)) {
+            !ctx->Scissor.Enabled)) {
          perf_debug("glBlitFramebuffer(): non-1:1 blit.  "
                     "Falling back to software rendering.\n");
          return mask;
@@ -696,8 +684,8 @@ intel_blit_framebuffer_with_blitter(struct gl_context *ctx,
             return mask;
          }
 
-         mesa_format src_format = _mesa_get_srgb_format_linear(src_rb->Format);
-         mesa_format dst_format = _mesa_get_srgb_format_linear(dst_rb->Format);
+         gl_format src_format = _mesa_get_srgb_format_linear(src_rb->Format);
+         gl_format dst_format = _mesa_get_srgb_format_linear(dst_rb->Format);
          if (src_format != dst_format) {
             perf_debug("glBlitFramebuffer(): unsupported blit from %s to %s.  "
                        "Falling back to software rendering.\n",
@@ -741,10 +729,10 @@ intel_blit_framebuffer(struct gl_context *ctx,
       return;
 
 
-   _mesa_meta_and_swrast_BlitFramebuffer(ctx,
-                                         srcX0, srcY0, srcX1, srcY1,
-                                         dstX0, dstY0, dstX1, dstY1,
-                                         mask, filter);
+   _mesa_meta_BlitFramebuffer(ctx,
+                              srcX0, srcY0, srcX1, srcY1,
+                              dstX0, dstY0, dstX1, dstY1,
+                              mask, filter);
 }
 
 /**

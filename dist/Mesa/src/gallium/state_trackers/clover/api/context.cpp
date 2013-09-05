@@ -22,118 +22,106 @@
 
 #include "api/util.hpp"
 #include "core/context.hpp"
-#include "core/platform.hpp"
 
 using namespace clover;
 
-CLOVER_API cl_context
-clCreateContext(const cl_context_properties *d_props, cl_uint num_devs,
-                const cl_device_id *d_devs,
+PUBLIC cl_context
+clCreateContext(const cl_context_properties *props, cl_uint num_devs,
+                const cl_device_id *devs,
                 void (CL_CALLBACK *pfn_notify)(const char *, const void *,
                                                size_t, void *),
-                void *user_data, cl_int *r_errcode) try {
-   auto props = obj<property_list_tag>(d_props);
-   auto devs = objs(d_devs, num_devs);
+                void *user_data, cl_int *errcode_ret) try {
+   auto mprops = property_map(props);
 
-   if (!pfn_notify && user_data)
+   if (!devs || !num_devs ||
+       (!pfn_notify && user_data))
       throw error(CL_INVALID_VALUE);
 
-   for (auto &prop : props) {
-      if (prop.first == CL_CONTEXT_PLATFORM)
-         obj(prop.second.as<cl_platform_id>());
-      else
+   if (any_of(is_zero<cl_device_id>, devs, devs + num_devs))
+      throw error(CL_INVALID_DEVICE);
+
+   for (auto p : mprops) {
+      if (p.first != CL_CONTEXT_PLATFORM)
          throw error(CL_INVALID_PROPERTY);
    }
 
-   ret_error(r_errcode, CL_SUCCESS);
-   return desc(new context(props, devs));
+   ret_error(errcode_ret, CL_SUCCESS);
+   return new context(
+      property_vector(mprops),
+      std::vector<cl_device_id>(devs, devs + num_devs));
 
-} catch (error &e) {
-   ret_error(r_errcode, e);
+} catch(error &e) {
+   ret_error(errcode_ret, e);
    return NULL;
 }
 
-CLOVER_API cl_context
-clCreateContextFromType(const cl_context_properties *d_props,
+PUBLIC cl_context
+clCreateContextFromType(const cl_context_properties *props,
                         cl_device_type type,
                         void (CL_CALLBACK *pfn_notify)(
                            const char *, const void *, size_t, void *),
-                        void *user_data, cl_int *r_errcode) try {
-   cl_platform_id d_platform;
+                        void *user_data, cl_int *errcode_ret) try {
+   cl_platform_id platform;
    cl_uint num_platforms;
+   cl_device_id dev;
    cl_int ret;
-   std::vector<cl_device_id> devs;
-   cl_uint num_devices;
 
-   ret = clGetPlatformIDs(1, &d_platform, &num_platforms);
+   ret = clGetPlatformIDs(1, &platform, &num_platforms);
    if (ret || !num_platforms)
       throw error(CL_INVALID_PLATFORM);
 
-   ret = clGetDeviceIDs(d_platform, type, 0, NULL, &num_devices);
-   if (ret)
-      throw error(CL_DEVICE_NOT_FOUND);
-   devs.resize(num_devices);
-   ret = clGetDeviceIDs(d_platform, type, num_devices, devs.data(), 0);
+   ret = clGetDeviceIDs(platform, type, 1, &dev, 0);
    if (ret)
       throw error(CL_DEVICE_NOT_FOUND);
 
-   return clCreateContext(d_props, num_devices, devs.data(), pfn_notify,
-                          user_data, r_errcode);
+   return clCreateContext(props, 1, &dev, pfn_notify, user_data, errcode_ret);
 
-} catch (error &e) {
-   ret_error(r_errcode, e);
+} catch(error &e) {
+   ret_error(errcode_ret, e);
    return NULL;
 }
 
-CLOVER_API cl_int
-clRetainContext(cl_context d_ctx) try {
-   obj(d_ctx).retain();
-   return CL_SUCCESS;
+PUBLIC cl_int
+clRetainContext(cl_context ctx) {
+   if (!ctx)
+      return CL_INVALID_CONTEXT;
 
-} catch (error &e) {
-   return e.get();
+   ctx->retain();
+   return CL_SUCCESS;
 }
 
-CLOVER_API cl_int
-clReleaseContext(cl_context d_ctx) try {
-   if (obj(d_ctx).release())
-      delete pobj(d_ctx);
+PUBLIC cl_int
+clReleaseContext(cl_context ctx) {
+   if (!ctx)
+      return CL_INVALID_CONTEXT;
+
+   if (ctx->release())
+      delete ctx;
 
    return CL_SUCCESS;
-
-} catch (error &e) {
-   return e.get();
 }
 
-CLOVER_API cl_int
-clGetContextInfo(cl_context d_ctx, cl_context_info param,
-                 size_t size, void *r_buf, size_t *r_size) try {
-   property_buffer buf { r_buf, size, r_size };
-   auto &ctx = obj(d_ctx);
+PUBLIC cl_int
+clGetContextInfo(cl_context ctx, cl_context_info param,
+                 size_t size, void *buf, size_t *size_ret) {
+   if (!ctx)
+      return CL_INVALID_CONTEXT;
 
    switch (param) {
    case CL_CONTEXT_REFERENCE_COUNT:
-      buf.as_scalar<cl_uint>() = ctx.ref_count();
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, ctx->ref_count());
 
    case CL_CONTEXT_NUM_DEVICES:
-      buf.as_scalar<cl_uint>() = ctx.devices().size();
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, ctx->devs.size());
 
    case CL_CONTEXT_DEVICES:
-      buf.as_vector<cl_device_id>() = descs(ctx.devices());
-      break;
+      return vector_property<cl_device_id>(buf, size, size_ret, ctx->devs);
 
    case CL_CONTEXT_PROPERTIES:
-      buf.as_vector<cl_context_properties>() = desc(ctx.properties());
-      break;
+      return vector_property<cl_context_properties>(buf, size, size_ret,
+                                                    ctx->props());
 
    default:
-      throw error(CL_INVALID_VALUE);
+      return CL_INVALID_VALUE;
    }
-
-   return CL_SUCCESS;
-
-} catch (error &e) {
-   return e.get();
 }

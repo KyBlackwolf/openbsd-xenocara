@@ -21,7 +21,6 @@
 //
 
 #include "core/device.hpp"
-#include "core/platform.hpp"
 #include "pipe/p_screen.h"
 #include "pipe/p_state.h"
 
@@ -39,35 +38,43 @@ namespace {
    }
 }
 
-device::device(clover::platform &platform, pipe_loader_device *ldev) :
+_cl_device_id::_cl_device_id(clover::platform &platform,
+                             pipe_loader_device *ldev) :
    platform(platform), ldev(ldev) {
    pipe = pipe_loader_create_screen(ldev, PIPE_SEARCH_DIR);
-   if (!pipe || !pipe->get_param(pipe, PIPE_CAP_COMPUTE)) {
-      if (pipe)
-         pipe->destroy(pipe);
+   if (!pipe || !pipe->get_param(pipe, PIPE_CAP_COMPUTE))
       throw error(CL_INVALID_DEVICE);
-   }
 }
 
-device::~device() {
+_cl_device_id::_cl_device_id(_cl_device_id &&dev) :
+   platform(dev.platform), pipe(dev.pipe), ldev(dev.ldev) {
+   dev.pipe = NULL;
+   dev.ldev = NULL;
+}
+
+_cl_device_id::~_cl_device_id() {
    if (pipe)
       pipe->destroy(pipe);
    if (ldev)
       pipe_loader_release(&ldev, 1);
 }
 
-bool
-device::operator==(const device &dev) const {
-   return this == &dev;
+_cl_device_id &
+_cl_device_id::operator=(_cl_device_id dev) {
+   assert(&platform == &dev.platform);
+
+   std::swap(pipe, dev.pipe);
+   std::swap(ldev, dev.ldev);
+
+   return *this;
 }
 
 cl_device_type
-device::type() const {
+_cl_device_id::type() const {
    switch (ldev->type) {
    case PIPE_LOADER_DEVICE_SOFTWARE:
       return CL_DEVICE_TYPE_CPU;
    case PIPE_LOADER_DEVICE_PCI:
-   case PIPE_LOADER_DEVICE_PLATFORM:
       return CL_DEVICE_TYPE_GPU;
    default:
       assert(0);
@@ -76,10 +83,9 @@ device::type() const {
 }
 
 cl_uint
-device::vendor_id() const {
+_cl_device_id::vendor_id() const {
    switch (ldev->type) {
    case PIPE_LOADER_DEVICE_SOFTWARE:
-   case PIPE_LOADER_DEVICE_PLATFORM:
       return 0;
    case PIPE_LOADER_DEVICE_PCI:
       return ldev->u.pci.vendor_id;
@@ -90,109 +96,104 @@ device::vendor_id() const {
 }
 
 size_t
-device::max_images_read() const {
+_cl_device_id::max_images_read() const {
    return PIPE_MAX_SHADER_RESOURCES;
 }
 
 size_t
-device::max_images_write() const {
+_cl_device_id::max_images_write() const {
    return PIPE_MAX_SHADER_RESOURCES;
 }
 
 cl_uint
-device::max_image_levels_2d() const {
+_cl_device_id::max_image_levels_2d() const {
    return pipe->get_param(pipe, PIPE_CAP_MAX_TEXTURE_2D_LEVELS);
 }
 
 cl_uint
-device::max_image_levels_3d() const {
+_cl_device_id::max_image_levels_3d() const {
    return pipe->get_param(pipe, PIPE_CAP_MAX_TEXTURE_3D_LEVELS);
 }
 
 cl_uint
-device::max_samplers() const {
+_cl_device_id::max_samplers() const {
    return pipe->get_shader_param(pipe, PIPE_SHADER_COMPUTE,
                                  PIPE_SHADER_CAP_MAX_TEXTURE_SAMPLERS);
 }
 
 cl_ulong
-device::max_mem_global() const {
+_cl_device_id::max_mem_global() const {
    return get_compute_param<uint64_t>(pipe,
                                       PIPE_COMPUTE_CAP_MAX_GLOBAL_SIZE)[0];
 }
 
 cl_ulong
-device::max_mem_local() const {
+_cl_device_id::max_mem_local() const {
    return get_compute_param<uint64_t>(pipe,
                                       PIPE_COMPUTE_CAP_MAX_LOCAL_SIZE)[0];
 }
 
 cl_ulong
-device::max_mem_input() const {
+_cl_device_id::max_mem_input() const {
    return get_compute_param<uint64_t>(pipe,
                                       PIPE_COMPUTE_CAP_MAX_INPUT_SIZE)[0];
 }
 
 cl_ulong
-device::max_const_buffer_size() const {
+_cl_device_id::max_const_buffer_size() const {
    return pipe->get_shader_param(pipe, PIPE_SHADER_COMPUTE,
                                  PIPE_SHADER_CAP_MAX_CONSTS) * 16;
 }
 
 cl_uint
-device::max_const_buffers() const {
+_cl_device_id::max_const_buffers() const {
    return pipe->get_shader_param(pipe, PIPE_SHADER_COMPUTE,
                                  PIPE_SHADER_CAP_MAX_CONST_BUFFERS);
 }
 
 size_t
-device::max_threads_per_block() const {
+_cl_device_id::max_threads_per_block() const {
    return get_compute_param<uint64_t>(
       pipe, PIPE_COMPUTE_CAP_MAX_THREADS_PER_BLOCK)[0];
 }
 
 cl_ulong
-device::max_mem_alloc_size() const {
+_cl_device_id::max_mem_alloc_size() const {
    return get_compute_param<uint64_t>(pipe,
                                       PIPE_COMPUTE_CAP_MAX_MEM_ALLOC_SIZE)[0];
 }
 
-cl_uint
-device::max_clock_frequency() const {
-   return get_compute_param<uint32_t>(pipe,
-                                      PIPE_COMPUTE_CAP_MAX_CLOCK_FREQUENCY)[0];
-}
-
 std::vector<size_t>
-device::max_block_size() const {
+_cl_device_id::max_block_size() const {
    auto v = get_compute_param<uint64_t>(pipe, PIPE_COMPUTE_CAP_MAX_BLOCK_SIZE);
    return { v.begin(), v.end() };
 }
 
 std::string
-device::device_name() const {
+_cl_device_id::device_name() const {
    return pipe->get_name(pipe);
 }
 
 std::string
-device::vendor_name() const {
+_cl_device_id::vendor_name() const {
    return pipe->get_vendor(pipe);
 }
 
 enum pipe_shader_ir
-device::ir_format() const {
-   return (enum pipe_shader_ir) pipe->get_shader_param(
-      pipe, PIPE_SHADER_COMPUTE, PIPE_SHADER_CAP_PREFERRED_IR);
+_cl_device_id::ir_format() const {
+   return (enum pipe_shader_ir) pipe->get_shader_param(pipe,
+                                                  PIPE_SHADER_COMPUTE,
+                                                  PIPE_SHADER_CAP_PREFERRED_IR);
 }
 
 std::string
-device::ir_target() const {
-   std::vector<char> target = get_compute_param<char>(
-      pipe, PIPE_COMPUTE_CAP_IR_TARGET);
+_cl_device_id::ir_target() const {
+   std::vector<char> target = get_compute_param<char>(pipe,
+                                                    PIPE_COMPUTE_CAP_IR_TARGET);
    return { target.data() };
 }
 
 enum pipe_endian
-device::endianness() const {
+_cl_device_id::endianness() const {
    return (enum pipe_endian)pipe->get_param(pipe, PIPE_CAP_ENDIANNESS);
 }

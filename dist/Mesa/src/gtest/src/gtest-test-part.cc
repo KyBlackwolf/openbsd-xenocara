@@ -48,10 +48,10 @@ using internal::GetUnitTestImpl;
 
 // Gets the summary of the failure message by omitting the stack trace
 // in it.
-std::string TestPartResult::ExtractSummary(const char* message) {
+internal::String TestPartResult::ExtractSummary(const char* message) {
   const char* const stack_trace = strstr(message, internal::kStackTraceMarker);
-  return stack_trace == NULL ? message :
-      std::string(message, stack_trace);
+  return stack_trace == NULL ? internal::String(message) :
+      internal::String(message, stack_trace - message);
 }
 
 // Prints a TestPartResult object.

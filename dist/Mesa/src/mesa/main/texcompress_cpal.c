@@ -1,7 +1,7 @@
 /*
  * Mesa 3-D graphics library
  *
- * Copyright 2008 VMware, Inc.
+ * Copyright 2008 Tungsten Graphics, Inc., Cedar Park, Texas.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),

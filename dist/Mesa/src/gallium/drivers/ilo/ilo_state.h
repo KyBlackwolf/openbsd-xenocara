@@ -136,7 +136,4 @@ void
 ilo_mark_states_with_resource_dirty(struct ilo_context *ilo,
                                     const struct pipe_resource *res);
 
-void
-ilo_dump_dirty_flags(uint32_t dirty);
-
 #endif /* ILO_STATE_H */

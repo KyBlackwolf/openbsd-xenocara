@@ -20,29 +20,47 @@
 // OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#ifndef CLOVER_CORE_PLATFORM_HPP
-#define CLOVER_CORE_PLATFORM_HPP
+#ifndef __CORE_PLATFORM_HPP__
+#define __CORE_PLATFORM_HPP__
 
 #include <vector>
 
-#include "core/object.hpp"
+#include "core/base.hpp"
 #include "core/device.hpp"
-#include "util/range.hpp"
 
 namespace clover {
-   class platform : public _cl_platform_id,
-                    public adaptor_range<
-      evals, std::vector<intrusive_ref<device>> &> {
-   public:
-      platform();
-
-      platform(const platform &platform) = delete;
-      platform &
-      operator=(const platform &platform) = delete;
-
-   protected:
-      std::vector<intrusive_ref<device>> devs;
-   };
+   typedef struct _cl_platform_id platform;
 }
+
+struct _cl_platform_id {
+public:
+   typedef std::vector<clover::device>::iterator iterator;
+
+   _cl_platform_id();
+
+   ///
+   /// Container of all compute devices that are available in the platform.
+   ///
+   /// @{
+   iterator begin() {
+      return devs.begin();
+   }
+
+   iterator end() {
+      return devs.end();
+   }
+
+   clover::device &front() {
+      return devs.front();
+   }
+
+   clover::device &back() {
+      return devs.back();
+   }
+   /// @}
+
+protected:
+   std::vector<clover::device> devs;
+};
 
 #endif

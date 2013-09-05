@@ -142,13 +142,6 @@ emit_array_fetch(
 	return result;
 }
 
-static bool uses_temp_indirect_addressing(
-	struct lp_build_tgsi_context *bld_base)
-{
-	struct lp_build_tgsi_soa_context *bld = lp_soa_context(bld_base);
-	return (bld->indirect_files & (1 << TGSI_FILE_TEMPORARY));
-}
-
 static LLVMValueRef
 emit_fetch(
 	struct lp_build_tgsi_context *bld_base,
@@ -159,7 +152,7 @@ emit_fetch(
 	struct radeon_llvm_context * ctx = radeon_llvm_context(bld_base);
 	struct lp_build_tgsi_soa_context *bld = lp_soa_context(bld_base);
 	LLVMBuilderRef builder = bld_base->base.gallivm->builder;
-	LLVMValueRef result = NULL, ptr;
+	LLVMValueRef result, ptr;
 
 	if (swizzle == ~0) {
 		LLVMValueRef values[TGSI_NUM_CHANNELS];
@@ -191,11 +184,7 @@ emit_fetch(
 		break;
 
 	case TGSI_FILE_TEMPORARY:
-		if (uses_temp_indirect_addressing(bld_base)) {
-			ptr = lp_get_temp_ptr_soa(bld, reg->Register.Index, swizzle);
-			break;
-		}
-		ptr = ctx->temps[reg->Register.Index * TGSI_NUM_CHANNELS + swizzle];
+		ptr = lp_get_temp_ptr_soa(bld, reg->Register.Index, swizzle);
 		result = LLVMBuildLoad(builder, ptr, "");
 		break;
 
@@ -227,7 +216,6 @@ static void emit_declaration(
 	const struct tgsi_full_declaration *decl)
 {
 	struct radeon_llvm_context * ctx = radeon_llvm_context(bld_base);
-	unsigned first, last, i, idx;
 	switch(decl->Declaration.File) {
 	case TGSI_FILE_ADDRESS:
 	{
@@ -246,23 +234,7 @@ static void emit_declaration(
 	case TGSI_FILE_TEMPORARY:
 		if (decl->Declaration.Array && decl->Array.ArrayID <= RADEON_LLVM_MAX_ARRAYS)
 			ctx->arrays[decl->Array.ArrayID - 1] = decl->Range;
-		if (uses_temp_indirect_addressing(bld_base)) {
-			lp_emit_declaration_soa(bld_base, decl);
-			break;
-		}
-		first = decl->Range.First;
-		last = decl->Range.Last;
-		if (!ctx->temps_count) {
-			ctx->temps_count = bld_base->info->file_max[TGSI_FILE_TEMPORARY] + 1;
-			ctx->temps = MALLOC(TGSI_NUM_CHANNELS * ctx->temps_count * sizeof(LLVMValueRef));
-		}
-		for (idx = first; idx <= last; idx++) {
-			for (i = 0; i < TGSI_NUM_CHANNELS; i++) {
-				ctx->temps[idx * TGSI_NUM_CHANNELS + i] =
-					lp_build_alloca(bld_base->base.gallivm, bld_base->base.vec_type,
-						"temp");
-			}
-		}
+		lp_emit_declaration_soa(bld_base, decl);
 		break;
 
 	case TGSI_FILE_INPUT:
@@ -312,7 +284,6 @@ emit_store(
 	const struct tgsi_opcode_info * info,
 	LLVMValueRef dst[4])
 {
-	struct radeon_llvm_context * ctx = radeon_llvm_context(bld_base);
 	struct lp_build_tgsi_soa_context *bld = lp_soa_context(bld_base);
 	struct gallivm_state *gallivm = bld->bld_base.base.gallivm;
 	struct lp_build_context base = bld->bld_base.base;
@@ -388,10 +359,7 @@ emit_store(
 					break;
 
 				case TGSI_FILE_TEMPORARY:
-					if (uses_temp_indirect_addressing(bld_base))
-						temp_ptr = lp_get_temp_ptr_soa(bld, i + range.First, chan_index);
-					else
-						temp_ptr = ctx->temps[(i + range.First) * TGSI_NUM_CHANNELS + chan_index];
+					temp_ptr = lp_get_temp_ptr_soa(bld, i + range.First, chan_index);
 					break;
 
 				default:
@@ -409,11 +377,7 @@ emit_store(
 				break;
 
 			case TGSI_FILE_TEMPORARY:
-				if (uses_temp_indirect_addressing(bld_base)) {
-					temp_ptr = NULL;
-					break;
-				}
-				temp_ptr = ctx->temps[ TGSI_NUM_CHANNELS * reg->Register.Index + chan_index];
+				temp_ptr = lp_get_temp_ptr_soa(bld, reg->Register.Index, chan_index);
 				break;
 
 			default:
@@ -669,23 +633,31 @@ void radeon_llvm_emit_prepare_cube_coords(
 	coords[1] = coords[0];
 	coords[0] = coords[3];
 
-	if (target == TGSI_TEXTURE_CUBE_ARRAY ||
-	    target == TGSI_TEXTURE_SHADOWCUBE_ARRAY) {
-		/* for cube arrays coord.z = coord.w(array_index) * 8 + face */
-		/* coords_arg.w component - array_index for cube arrays */
-		coords[2] = lp_build_emit_llvm_ternary(bld_base, TGSI_OPCODE_MAD,
-						       coords_arg[3], lp_build_const_float(gallivm, 8.0), coords[2]);
-	}
+	/* all cases except simple cube map sampling require special handling
+	 * for coord vector */
+	if (target != TGSI_TEXTURE_CUBE ||
+		opcode != TGSI_OPCODE_TEX) {
 
-	/* Preserve compare/lod/bias. Put it in coords.w. */
-	if (opcode == TGSI_OPCODE_TEX2 ||
-	    opcode == TGSI_OPCODE_TXB2 ||
-	    opcode == TGSI_OPCODE_TXL2) {
-		coords[3] = coords_arg[4];
-	} else if (opcode == TGSI_OPCODE_TXB ||
-		   opcode == TGSI_OPCODE_TXL ||
-		   target == TGSI_TEXTURE_SHADOWCUBE) {
-		coords[3] = coords_arg[3];
+		/* for cube arrays coord.z = coord.w(array_index) * 8 + face */
+		if (target == TGSI_TEXTURE_CUBE_ARRAY ||
+			target == TGSI_TEXTURE_SHADOWCUBE_ARRAY) {
+
+			/* coords_arg.w component - array_index for cube arrays or
+			 * compare value for SHADOWCUBE */
+			coords[2] = lp_build_emit_llvm_ternary(bld_base, TGSI_OPCODE_MAD,
+					coords_arg[3], lp_build_const_float(gallivm, 8.0), coords[2]);
+		}
+
+		/* for instructions that need additional src (compare/lod/bias),
+		 * put it in coord.w */
+		if (opcode == TGSI_OPCODE_TEX2 ||
+			opcode == TGSI_OPCODE_TXB2 ||
+			opcode == TGSI_OPCODE_TXL2) {
+			coords[3] = coords_arg[4];
+		} else if (opcode == TGSI_OPCODE_TXB ||
+			opcode == TGSI_OPCODE_TXL) {
+			coords[3] = coords_arg[3];
+		}
 	}
 
 	memcpy(coords_arg, coords, sizeof(coords));
@@ -863,14 +835,10 @@ static void emit_ucmp(
 {
 	LLVMBuilderRef builder = bld_base->base.gallivm->builder;
 
-	LLVMValueRef arg0 = LLVMBuildBitCast(builder, emit_data->args[0],
-					     bld_base->uint_bld.elem_type, "");
+	LLVMValueRef v = LLVMBuildFCmp(builder, LLVMRealUGE,
+			emit_data->args[0], lp_build_const_float(bld_base->base.gallivm, 0.), "");
 
-	LLVMValueRef v = LLVMBuildICmp(builder, LLVMIntNE, arg0,
-				       bld_base->uint_bld.zero, "");
-
-	emit_data->output[emit_data->chan] =
-		LLVMBuildSelect(builder, v, emit_data->args[1], emit_data->args[2], "");
+	emit_data->output[emit_data->chan] = LLVMBuildSelect(builder, v, emit_data->args[2], emit_data->args[1], "");
 }
 
 static void emit_cmp(
@@ -882,16 +850,18 @@ static void emit_cmp(
 	LLVMRealPredicate pred;
 	LLVMValueRef cond;
 
-	/* Use ordered for everything but NE (which is usual for
-	 * float comparisons)
+	/* XXX I'm not sure whether to do unordered or ordered comparisons,
+	 * but llvmpipe uses unordered comparisons, so for consistency we use
+	 * unordered.  (The authors of llvmpipe aren't sure about using
+	 * unordered vs ordered comparisons either.
 	 */
 	switch (emit_data->inst->Instruction.Opcode) {
-	case TGSI_OPCODE_SGE: pred = LLVMRealOGE; break;
-	case TGSI_OPCODE_SEQ: pred = LLVMRealOEQ; break;
-	case TGSI_OPCODE_SLE: pred = LLVMRealOLE; break;
-	case TGSI_OPCODE_SLT: pred = LLVMRealOLT; break;
+	case TGSI_OPCODE_SGE: pred = LLVMRealUGE; break;
+	case TGSI_OPCODE_SEQ: pred = LLVMRealUEQ; break;
+	case TGSI_OPCODE_SLE: pred = LLVMRealULE; break;
+	case TGSI_OPCODE_SLT: pred = LLVMRealULT; break;
 	case TGSI_OPCODE_SNE: pred = LLVMRealUNE; break;
-	case TGSI_OPCODE_SGT: pred = LLVMRealOGT; break;
+	case TGSI_OPCODE_SGT: pred = LLVMRealUGT; break;
 	default: assert(!"unknown instruction"); pred = 0; break;
 	}
 
@@ -900,35 +870,6 @@ static void emit_cmp(
 
 	emit_data->output[emit_data->chan] = LLVMBuildSelect(builder,
 		cond, bld_base->base.one, bld_base->base.zero, "");
-}
-
-static void emit_fcmp(
-		const struct lp_build_tgsi_action *action,
-		struct lp_build_tgsi_context * bld_base,
-		struct lp_build_emit_data * emit_data)
-{
-	LLVMBuilderRef builder = bld_base->base.gallivm->builder;
-	LLVMContextRef context = bld_base->base.gallivm->context;
-	LLVMRealPredicate pred;
-
-	/* Use ordered for everything but NE (which is usual for
-	 * float comparisons)
-	 */
-	switch (emit_data->inst->Instruction.Opcode) {
-	case TGSI_OPCODE_FSEQ: pred = LLVMRealOEQ; break;
-	case TGSI_OPCODE_FSGE: pred = LLVMRealOGE; break;
-	case TGSI_OPCODE_FSLT: pred = LLVMRealOLT; break;
-	case TGSI_OPCODE_FSNE: pred = LLVMRealUNE; break;
-	default: assert(!"unknown instruction"); pred = 0; break;
-	}
-
-	LLVMValueRef v = LLVMBuildFCmp(builder, pred,
-			emit_data->args[0], emit_data->args[1],"");
-
-	v = LLVMBuildSExtOrBitCast(builder, v,
-			LLVMInt32TypeInContext(context), "");
-
-	emit_data->output[emit_data->chan] = v;
 }
 
 static void emit_not(
@@ -1295,10 +1236,6 @@ void radeon_llvm_context_init(struct radeon_llvm_context * ctx)
 	bld_base->op_actions[TGSI_OPCODE_FRC].intr_name = "llvm.AMDIL.fraction.";
 	bld_base->op_actions[TGSI_OPCODE_F2I].emit = emit_f2i;
 	bld_base->op_actions[TGSI_OPCODE_F2U].emit = emit_f2u;
-	bld_base->op_actions[TGSI_OPCODE_FSEQ].emit = emit_fcmp;
-	bld_base->op_actions[TGSI_OPCODE_FSGE].emit = emit_fcmp;
-	bld_base->op_actions[TGSI_OPCODE_FSLT].emit = emit_fcmp;
-	bld_base->op_actions[TGSI_OPCODE_FSNE].emit = emit_fcmp;
 	bld_base->op_actions[TGSI_OPCODE_IABS].emit = build_tgsi_intrinsic_nomem;
 	bld_base->op_actions[TGSI_OPCODE_IABS].intr_name = "llvm.AMDIL.abs.";
 	bld_base->op_actions[TGSI_OPCODE_IDIV].emit = emit_idiv;
@@ -1378,11 +1315,7 @@ void radeon_llvm_context_init(struct radeon_llvm_context * ctx)
 	bld_base->op_actions[TGSI_OPCODE_UCMP].emit = emit_ucmp;
 
 	bld_base->rsq_action.emit = build_tgsi_intrinsic_nomem;
-#if HAVE_LLVM >= 0x0305
-	bld_base->rsq_action.intr_name = "llvm.AMDGPU.rsq.clamped.f32";
-#else
 	bld_base->rsq_action.intr_name = "llvm.AMDGPU.rsq";
-#endif
 }
 
 void radeon_llvm_create_func(struct radeon_llvm_context * ctx,
@@ -1419,7 +1352,7 @@ void radeon_llvm_finalize_module(struct radeon_llvm_context * ctx)
 	LLVMAddAggressiveDCEPass(gallivm->passmgr);
 	LLVMAddCFGSimplificationPass(gallivm->passmgr);
 
-	/* Run the pass */
+	/* Run the passs */
 	LLVMRunFunctionPassManager(gallivm->passmgr, ctx->main_fn);
 
 	LLVMDisposeBuilder(gallivm->builder);
@@ -1431,6 +1364,4 @@ void radeon_llvm_dispose(struct radeon_llvm_context * ctx)
 {
 	LLVMDisposeModule(ctx->soa.bld_base.base.gallivm->module);
 	LLVMContextDispose(ctx->soa.bld_base.base.gallivm->context);
-	FREE(ctx->temps);
-	ctx->temps = NULL;
 }

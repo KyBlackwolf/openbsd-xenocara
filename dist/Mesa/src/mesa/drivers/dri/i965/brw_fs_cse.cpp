@@ -28,7 +28,7 @@
  *
  * Support for local common subexpression elimination.
  *
- * See Muchnick's Advanced Compiler Design and Implementation, section
+ * See Muchnik's Advanced Compiler Design and Implementation, section
  * 13.1 (p378).
  */
 
@@ -53,9 +53,9 @@ is_expression(const fs_inst *const inst)
    case BRW_OPCODE_XOR:
    case BRW_OPCODE_SHR:
    case BRW_OPCODE_SHL:
+   case BRW_OPCODE_RSR:
+   case BRW_OPCODE_RSL:
    case BRW_OPCODE_ASR:
-   case BRW_OPCODE_CMP:
-   case BRW_OPCODE_CMPN:
    case BRW_OPCODE_ADD:
    case BRW_OPCODE_MUL:
    case BRW_OPCODE_FRC:
@@ -79,41 +79,9 @@ is_expression(const fs_inst *const inst)
 }
 
 static bool
-is_expression_commutative(enum opcode op)
+operands_match(fs_reg *xs, fs_reg *ys)
 {
-   switch (op) {
-   case BRW_OPCODE_AND:
-   case BRW_OPCODE_OR:
-   case BRW_OPCODE_XOR:
-   case BRW_OPCODE_ADD:
-   case BRW_OPCODE_MUL:
-      return true;
-   default:
-      return false;
-   }
-}
-
-static bool
-operands_match(enum opcode op, fs_reg *xs, fs_reg *ys)
-{
-   if (!is_expression_commutative(op)) {
-      return xs[0].equals(ys[0]) && xs[1].equals(ys[1]) && xs[2].equals(ys[2]);
-   } else {
-      return (xs[0].equals(ys[0]) && xs[1].equals(ys[1])) ||
-             (xs[1].equals(ys[0]) && xs[0].equals(ys[1]));
-   }
-}
-
-static bool
-instructions_match(fs_inst *a, fs_inst *b)
-{
-   return a->opcode == b->opcode &&
-          a->saturate == b->saturate &&
-          a->predicate == b->predicate &&
-          a->predicate_inverse == b->predicate_inverse &&
-          a->conditional_mod == b->conditional_mod &&
-          a->dst.type == b->dst.type &&
-          operands_match(a->opcode, a->src, b->src);
+   return xs[0].equals(ys[0]) && xs[1].equals(ys[1]) && xs[2].equals(ys[2]);
 }
 
 bool
@@ -121,7 +89,7 @@ fs_visitor::opt_cse_local(bblock_t *block, exec_list *aeb)
 {
    bool progress = false;
 
-   void *cse_ctx = ralloc_context(NULL);
+   void *mem_ctx = ralloc_context(this->mem_ctx);
 
    int ip = block->start_ip;
    for (fs_inst *inst = (fs_inst *)block->start;
@@ -130,7 +98,7 @@ fs_visitor::opt_cse_local(bblock_t *block, exec_list *aeb)
 
       /* Skip some cases. */
       if (is_expression(inst) && !inst->is_partial_write() &&
-          (inst->dst.file != HW_REG || inst->dst.is_null()))
+          !inst->conditional_mod)
       {
 	 bool found = false;
 
@@ -139,7 +107,11 @@ fs_visitor::opt_cse_local(bblock_t *block, exec_list *aeb)
 	    entry = (aeb_entry *) entry_node;
 
 	    /* Match current instruction's expression against those in AEB. */
-	    if (instructions_match(inst, entry->generator)) {
+	    if (inst->opcode == entry->generator->opcode &&
+		inst->saturate == entry->generator->saturate &&
+                inst->dst.type == entry->generator->dst.type &&
+                operands_match(entry->generator->src, inst->src)) {
+
 	       found = true;
 	       progress = true;
 	       break;
@@ -148,7 +120,7 @@ fs_visitor::opt_cse_local(bblock_t *block, exec_list *aeb)
 
 	 if (!found) {
 	    /* Our first sighting of this expression.  Create an entry. */
-	    aeb_entry *entry = ralloc(cse_ctx, aeb_entry);
+	    aeb_entry *entry = ralloc(mem_ctx, aeb_entry);
 	    entry->tmp = reg_undef;
 	    entry->generator = inst;
 	    aeb->push_tail(entry);
@@ -157,7 +129,7 @@ fs_visitor::opt_cse_local(bblock_t *block, exec_list *aeb)
 	     * If we don't have a temporary already, make one.
 	     */
 	    bool no_existing_temp = entry->tmp.file == BAD_FILE;
-	    if (no_existing_temp && !entry->generator->dst.is_null()) {
+	    if (no_existing_temp) {
                int written = entry->generator->regs_written;
 
                fs_reg orig_dst = entry->generator->dst;
@@ -178,55 +150,34 @@ fs_visitor::opt_cse_local(bblock_t *block, exec_list *aeb)
 	    }
 
 	    /* dest <- temp */
-            if (!inst->dst.is_null()) {
-               int written = inst->regs_written;
-               assert(written == entry->generator->regs_written);
-               assert(inst->dst.type == entry->tmp.type);
-               fs_reg dst = inst->dst;
-               fs_reg tmp = entry->tmp;
-               fs_inst *copy = NULL;
-               for (int i = 0; i < written; i++) {
-                  copy = MOV(dst, tmp);
-                  copy->force_writemask_all = inst->force_writemask_all;
-                  inst->insert_before(copy);
+            int written = inst->regs_written;
+            assert(written == entry->generator->regs_written);
+            assert(inst->dst.type == entry->tmp.type);
+            fs_reg dst = inst->dst;
+            fs_reg tmp = entry->tmp;
+            fs_inst *copy = NULL;
+            for (int i = 0; i < written; i++) {
+               copy = MOV(dst, tmp);
+               copy->force_writemask_all = inst->force_writemask_all;
+               inst->insert_before(copy);
 
-                  dst.reg_offset++;
-                  tmp.reg_offset++;
-               }
+               dst.reg_offset++;
+               tmp.reg_offset++;
             }
-
-            /* Set our iterator so that next time through the loop inst->next
-             * will get the instruction in the basic block after the one we've
-             * removed.
-             */
-            fs_inst *prev = (fs_inst *)inst->prev;
-
             inst->remove();
 
 	    /* Appending an instruction may have changed our bblock end. */
 	    if (inst == block->end) {
-	       block->end = prev;
+	       block->end = copy;
 	    }
 
-            inst = prev;
+	    /* Continue iteration with copy->next */
+	    inst = copy;
 	 }
       }
 
       foreach_list_safe(entry_node, aeb) {
 	 aeb_entry *entry = (aeb_entry *)entry_node;
-
-         /* Kill all AEB entries that write a different value to or read from
-          * the flag register if we just wrote it.
-          */
-         if (inst->writes_flag()) {
-            if (entry->generator->reads_flag() ||
-                (entry->generator->writes_flag() &&
-                 !instructions_match(inst, entry->generator))) {
-               entry->remove();
-               ralloc_free(entry);
-               continue;
-            }
-         }
 
 	 for (int i = 0; i < 3; i++) {
             fs_reg *src_reg = &entry->generator->src[i];
@@ -254,10 +205,10 @@ fs_visitor::opt_cse_local(bblock_t *block, exec_list *aeb)
       ip++;
    }
 
-   ralloc_free(cse_ctx);
+   ralloc_free(mem_ctx);
 
    if (progress)
-      invalidate_live_intervals();
+      this->live_intervals_valid = false;
 
    return progress;
 }
@@ -269,7 +220,7 @@ fs_visitor::opt_cse()
 
    calculate_live_intervals();
 
-   cfg_t cfg(&instructions);
+   cfg_t cfg(this);
 
    for (int b = 0; b < cfg.num_blocks; b++) {
       bblock_t *block = cfg.blocks[b];

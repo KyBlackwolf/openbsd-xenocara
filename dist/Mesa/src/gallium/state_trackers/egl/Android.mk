@@ -23,14 +23,22 @@
 
 LOCAL_PATH := $(call my-dir)
 
-# get common_FILES, android_FILES
-include $(LOCAL_PATH)/Makefile.sources
+common_SOURCES := \
+	common/egl_g3d.c \
+	common/egl_g3d_api.c \
+	common/egl_g3d_image.c \
+	common/egl_g3d_st.c \
+	common/egl_g3d_sync.c \
+	common/native_helper.c
+
+android_SOURCES := \
+	android/native_android.cpp
 
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-	$(common_FILES) \
-	$(android_FILES)
+	$(common_SOURCES) \
+	$(android_SOURCES)
 
 LOCAL_CFLAGS := -DHAVE_ANDROID_BACKEND
 

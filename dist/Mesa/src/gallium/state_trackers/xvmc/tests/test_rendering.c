@@ -18,7 +18,7 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
- * IN NO EVENT SHALL VMWARE AND/OR ITS SUPPLIERS BE LIABLE FOR
+ * IN NO EVENT SHALL TUNGSTEN GRAPHICS AND/OR ITS SUPPLIERS BE LIABLE FOR
  * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -50,7 +50,9 @@
 #define DEFAULT_OUTPUT_HEIGHT		INPUT_HEIGHT
 #define DEFAULT_ACCEPTABLE_ERR		0.01
 
-static void ParseArgs(int argc, char **argv, unsigned int *output_width, unsigned int *output_height, double *acceptable_error, int *prompt)
+void ParseArgs(int argc, char **argv, unsigned int *output_width, unsigned int *output_height, double *acceptable_error, int *prompt);
+
+void ParseArgs(int argc, char **argv, unsigned int *output_width, unsigned int *output_height, double *acceptable_error, int *prompt)
 {
 	int fail = 0;
 	int i;
@@ -58,7 +60,7 @@ static void ParseArgs(int argc, char **argv, unsigned int *output_width, unsigne
 	*output_width = DEFAULT_OUTPUT_WIDTH;
 	*output_height = DEFAULT_OUTPUT_HEIGHT;
 	*acceptable_error = DEFAULT_ACCEPTABLE_ERR;
-	*prompt = 0;
+	*prompt = 1;
 
 	for (i = 1; i < argc && !fail; ++i)
 	{
@@ -77,8 +79,8 @@ static void ParseArgs(int argc, char **argv, unsigned int *output_width, unsigne
 			if (sscanf(argv[++i], "%lf", acceptable_error) != 1)
 				fail = 1;
 		}
-		else if (!strcmp(argv[i], "-p"))
-			*prompt = 1;
+		else if (strcmp(argv[i], "-n"))
+			*prompt = 0;
 		else
 			fail = 1;
 	}
@@ -93,7 +95,7 @@ static void ParseArgs(int argc, char **argv, unsigned int *output_width, unsigne
 			"\t-w <width>\tOutput width\n"
 			"\t-h <height>\tOutput height\n"
 			"\t-e <error>\tAcceptable margin of error per pixel, from 0 to 1\n"
-			"\t-p\tPrompt for quit\n",
+			"\t-n\tDon't prompt for quit\n",
 			argv[0]
 		);
 }

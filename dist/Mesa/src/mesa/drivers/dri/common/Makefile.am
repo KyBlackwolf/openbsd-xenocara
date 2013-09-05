@@ -21,34 +21,26 @@
 
 SUBDIRS = xmlpool
 
-include Makefile.sources
-
 AM_CFLAGS = \
 	-I$(top_srcdir)/include \
 	-I$(top_srcdir)/src/ \
 	-I$(top_srcdir)/src/mapi \
 	-I$(top_srcdir)/src/mesa/ \
 	$(DEFINES) \
-	$(EXPAT_CFLAGS) \
+	$(LIBDRM_CFLAGS) \
 	$(VISIBILITY_CFLAGS)
 
 noinst_LTLIBRARIES = \
 	libdricommon.la \
-	libmegadriver_stub.la \
 	libdri_test_stubs.la
 
-libdricommon_la_SOURCES = $(DRI_COMMON_FILES)
+libdricommon_la_SOURCES = \
+	utils.c \
+	dri_util.c \
+	xmlconfig.c
 
-libdri_test_stubs_la_SOURCES = $(test_stubs_FILES)
+libdri_test_stubs_la_SOURCES = \
+	dri_test.c
 libdri_test_stubs_la_CFLAGS = $(AM_CFLAGS) -DNO_MAIN
 
-libmegadriver_stub_la_SOURCES = $(megadriver_stub_FILES)
-
 sysconf_DATA = drirc
-
-if DRICOMMON_NEED_LIBDRM
-AM_CFLAGS += $(LIBDRM_CFLAGS)
-libdricommon_la_LIBADD = $(LIBDRM_LIBS)
-else
-AM_CFLAGS += -D__NOT_HAVE_DRM_H
-endif

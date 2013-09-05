@@ -40,6 +40,7 @@
 static void
 fd2_context_destroy(struct pipe_context *pctx)
 {
+	fd2_prog_fini(pctx);
 	fd_context_destroy(pctx);
 }
 
@@ -66,29 +67,9 @@ create_solid_vertexbuf(struct pipe_context *pctx)
 	return prsc;
 }
 
-static const uint8_t a22x_primtypes[PIPE_PRIM_MAX] = {
-		[PIPE_PRIM_POINTS]         = DI_PT_POINTLIST_A2XX,
-		[PIPE_PRIM_LINES]          = DI_PT_LINELIST,
-		[PIPE_PRIM_LINE_STRIP]     = DI_PT_LINESTRIP,
-		[PIPE_PRIM_LINE_LOOP]      = DI_PT_LINELOOP,
-		[PIPE_PRIM_TRIANGLES]      = DI_PT_TRILIST,
-		[PIPE_PRIM_TRIANGLE_STRIP] = DI_PT_TRISTRIP,
-		[PIPE_PRIM_TRIANGLE_FAN]   = DI_PT_TRIFAN,
-};
-
-static const uint8_t a20x_primtypes[PIPE_PRIM_MAX] = {
-		[PIPE_PRIM_POINTS]         = DI_PT_POINTLIST_A2XX,
-		[PIPE_PRIM_LINES]          = DI_PT_LINELIST,
-		[PIPE_PRIM_LINE_STRIP]     = DI_PT_LINESTRIP,
-		[PIPE_PRIM_TRIANGLES]      = DI_PT_TRILIST,
-		[PIPE_PRIM_TRIANGLE_STRIP] = DI_PT_TRISTRIP,
-		[PIPE_PRIM_TRIANGLE_FAN]   = DI_PT_TRIFAN,
-};
-
 struct pipe_context *
 fd2_context_create(struct pipe_screen *pscreen, void *priv)
 {
-	struct fd_screen *screen = fd_screen(pscreen);
 	struct fd2_context *fd2_ctx = CALLOC_STRUCT(fd2_context);
 	struct pipe_context *pctx;
 
@@ -96,8 +77,6 @@ fd2_context_create(struct pipe_screen *pscreen, void *priv)
 		return NULL;
 
 	pctx = &fd2_ctx->base.base;
-
-	fd2_ctx->base.dev = fd_device_ref(screen->dev);
 
 	pctx->destroy = fd2_context_destroy;
 	pctx->create_blend_state = fd2_blend_state_create;
@@ -109,9 +88,7 @@ fd2_context_create(struct pipe_screen *pscreen, void *priv)
 	fd2_texture_init(pctx);
 	fd2_prog_init(pctx);
 
-	pctx = fd_context_init(&fd2_ctx->base, pscreen,
-			(screen->gpu_id >= 220) ? a22x_primtypes : a20x_primtypes,
-			priv);
+	pctx = fd_context_init(&fd2_ctx->base, pscreen, priv);
 	if (!pctx)
 		return NULL;
 

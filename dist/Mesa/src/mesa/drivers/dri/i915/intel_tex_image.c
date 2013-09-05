@@ -219,7 +219,7 @@ intel_set_texture_image_region(struct gl_context *ctx,
 			       struct intel_region *region,
 			       GLenum target,
 			       GLenum internalFormat,
-			       mesa_format format,
+			       gl_format format,
                                uint32_t offset,
                                GLuint width,
                                GLuint height,
@@ -287,7 +287,7 @@ intelSetTexBuffer2(__DRIcontext *pDRICtx, GLint target,
    struct gl_texture_object *texObj;
    struct gl_texture_image *texImage;
    int level = 0, internalFormat = 0;
-   mesa_format texFormat = MESA_FORMAT_NONE;
+   gl_format texFormat = MESA_FORMAT_NONE;
 
    texObj = _mesa_get_current_tex_object(ctx, target);
    intelObj = intel_texture_object(texObj);
@@ -309,15 +309,15 @@ intelSetTexBuffer2(__DRIcontext *pDRICtx, GLint target,
    if (rb->mt->cpp == 4) {
       if (texture_format == __DRI_TEXTURE_FORMAT_RGB) {
          internalFormat = GL_RGB;
-         texFormat = MESA_FORMAT_B8G8R8X8_UNORM;
+         texFormat = MESA_FORMAT_XRGB8888;
       }
       else {
          internalFormat = GL_RGBA;
-         texFormat = MESA_FORMAT_B8G8R8A8_UNORM;
+         texFormat = MESA_FORMAT_ARGB8888;
       }
    } else if (rb->mt->cpp == 2) {
       internalFormat = GL_RGB;
-      texFormat = MESA_FORMAT_B5G6R5_UNORM;
+      texFormat = MESA_FORMAT_RGB565;
    }
 
    _mesa_lock_texture(&intel->ctx, texObj);

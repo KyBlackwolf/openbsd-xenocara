@@ -25,9 +25,7 @@
  *
  */
 
-#include "brw_shader.h"
-
-class bblock_t;
+#include "brw_fs.h"
 
 class bblock_link : public exec_node {
 public:
@@ -41,12 +39,21 @@ public:
 
 class bblock_t {
 public:
-   DECLARE_RALLOC_CXX_OPERATORS(bblock_t)
+   static void* operator new(size_t size, void *ctx)
+   {
+      void *node;
+
+      node = rzalloc_size(ctx, size);
+      assert(node != NULL);
+
+      return node;
+   }
+
+   bblock_link *make_list(void *mem_ctx);
 
    bblock_t();
 
    void add_successor(void *mem_ctx, bblock_t *successor);
-   void dump(backend_visitor *v);
 
    backend_instruction *start;
    backend_instruction *end;
@@ -57,30 +64,37 @@ public:
    exec_list parents;
    exec_list children;
    int block_num;
-
-   /* If the current basic block ends in an IF, ELSE, or ENDIF instruction,
-    * these pointers will hold the locations of the other associated control
-    * flow instructions.
-    *
-    * Otherwise they are NULL.
-    */
-   backend_instruction *if_inst;
-   backend_instruction *else_inst;
-   backend_instruction *endif_inst;
 };
 
 class cfg_t {
 public:
-   DECLARE_RALLOC_CXX_OPERATORS(cfg_t)
+   static void* operator new(size_t size, void *ctx)
+   {
+      void *node;
 
-   cfg_t(exec_list *instructions);
+      node = rzalloc_size(ctx, size);
+      assert(node != NULL);
+
+      return node;
+   }
+
+   cfg_t(backend_visitor *v);
+   cfg_t(void *mem_ctx, exec_list *instructions);
    ~cfg_t();
 
+   void create(void *mem_ctx, exec_list *instructions);
+
    bblock_t *new_block();
-   void set_next_block(bblock_t **cur, bblock_t *block, int ip);
+   void set_next_block(bblock_t *block);
    void make_block_array();
 
-   void dump(backend_visitor *v);
+   /** @{
+    *
+    * Used while generating the block list.
+    */
+   bblock_t *cur;
+   int ip;
+   /** @} */
 
    void *mem_ctx;
 

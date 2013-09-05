@@ -28,7 +28,6 @@
 
 #include "util/u_math.h"
 #include "adreno_common.xml.h"
-#include "adreno_pm4.xml.h"
 #include "a2xx.xml.h"
 
 

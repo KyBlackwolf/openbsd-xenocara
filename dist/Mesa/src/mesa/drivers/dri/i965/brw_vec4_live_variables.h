@@ -25,7 +25,6 @@
  *
  */
 
-#include "main/bitset.h"
 #include "brw_vec4.h"
 
 namespace brw {
@@ -37,23 +36,31 @@ struct block_data {
     * Note that for our purposes, "defined" means unconditionally, completely
     * defined.
     */
-   BITSET_WORD *def;
+   bool *def;
 
    /**
     * Which variables are used before being defined in the block.
     */
-   BITSET_WORD *use;
+   bool *use;
 
    /** Which defs reach the entry point of the block. */
-   BITSET_WORD *livein;
+   bool *livein;
 
    /** Which defs reach the exit point of the block. */
-   BITSET_WORD *liveout;
+   bool *liveout;
 };
 
 class vec4_live_variables {
 public:
-   DECLARE_RALLOC_CXX_OPERATORS(vec4_live_variables)
+   static void* operator new(size_t size, void *ctx)
+   {
+      void *node;
+
+      node = rzalloc_size(ctx, size);
+      assert(node != NULL);
+
+      return node;
+   }
 
    vec4_live_variables(vec4_visitor *v, cfg_t *cfg);
    ~vec4_live_variables();
@@ -66,7 +73,6 @@ public:
    void *mem_ctx;
 
    int num_vars;
-   int bitset_words;
 
    /** Per-basic-block information on live variables */
    struct block_data *bd;

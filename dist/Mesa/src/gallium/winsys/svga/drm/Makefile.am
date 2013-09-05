@@ -23,12 +23,15 @@
 include Makefile.sources
 include $(top_srcdir)/src/gallium/Automake.inc
 
-AM_CFLAGS = \
+AM_CPPFLAGS = \
 	-I$(top_srcdir)/src/gallium/drivers/svga \
 	-I$(top_srcdir)/src/gallium/drivers/svga/include \
+	-I$(top_srcdir)/include \
 	-I$(top_srcdir)/src/gallium/drivers \
-	$(GALLIUM_WINSYS_CFLAGS) \
+	$(GALLIUM_CFLAGS) \
 	$(LIBDRM_CFLAGS)
+
+AM_CFLAGS = $(VISIBILITY_CFLAGS)
 
 #On some systems -std= must be added to CFLAGS to be the last -std=
 CFLAGS += -std=gnu99 -D_FILE_OFFSET_BITS=64

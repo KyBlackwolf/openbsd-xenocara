@@ -345,180 +345,11 @@ _mesa_bytes_per_vertex_attrib(GLint comps, GLenum type)
          return sizeof(GLuint);
       else
          return -1;
-   case GL_UNSIGNED_INT_10F_11F_11F_REV:
-      if (comps == 3)
-         return sizeof(GLuint);
-      else
-         return -1;
    default:
       return -1;
    }
 }
 
-/**
- * Test if the given format is unsized.
- */
-GLboolean
-_mesa_is_enum_format_unsized(GLenum format)
-{
-   switch (format) {
-   case GL_RGBA:
-   case GL_BGRA:
-   case GL_ABGR_EXT:
-   case GL_RGB:
-   case GL_BGR:
-   case GL_RG:
-   case GL_RED:
-   case GL_GREEN:
-   case GL_BLUE:
-   case GL_ALPHA:
-   case GL_INTENSITY:
-   case GL_LUMINANCE:
-   case GL_LUMINANCE_ALPHA:
-
-   case GL_SRGB:
-   case GL_SRGB_ALPHA:
-   case GL_SLUMINANCE:
-   case GL_SLUMINANCE_ALPHA:
-
-   case GL_RGBA_SNORM:
-   case GL_RGB_SNORM:
-   case GL_RG_SNORM:
-   case GL_RED_SNORM:
-   case GL_ALPHA_SNORM:
-   case GL_INTENSITY_SNORM:
-   case GL_LUMINANCE_SNORM:
-   case GL_LUMINANCE_ALPHA_SNORM:
-
-   case GL_RED_INTEGER:
-   case GL_GREEN_INTEGER:
-   case GL_BLUE_INTEGER:
-   case GL_ALPHA_INTEGER:
-   case GL_RGB_INTEGER:
-   case GL_RGBA_INTEGER:
-   case GL_BGR_INTEGER:
-   case GL_BGRA_INTEGER:
-   case GL_RG_INTEGER:
-   case GL_LUMINANCE_INTEGER_EXT:
-   case GL_LUMINANCE_ALPHA_INTEGER_EXT:
-
-   case GL_DEPTH_COMPONENT:
-   case GL_DEPTH_STENCIL:
-   case GL_STENCIL_INDEX:
-      return GL_TRUE;
-   default:
-      return GL_FALSE;
-   }
-}
-
-/**
- * Test if the given format is a UNORM (unsigned-normalized) format.
- */
-GLboolean
-_mesa_is_enum_format_unorm(GLenum format)
-{
-      switch(format) {
-      case GL_RED:
-      case GL_GREEN:
-      case GL_BLUE:
-      case GL_ALPHA:
-      case GL_ALPHA4:
-      case GL_ALPHA8:
-      case GL_ALPHA12:
-      case GL_ALPHA16:
-      case 1:
-      case GL_LUMINANCE:
-      case GL_SLUMINANCE:
-      case GL_LUMINANCE4:
-      case GL_LUMINANCE8:
-      case GL_LUMINANCE12:
-      case GL_LUMINANCE16:
-      case 2:
-      case GL_LUMINANCE_ALPHA:
-      case GL_SLUMINANCE_ALPHA:
-      case GL_LUMINANCE4_ALPHA4:
-      case GL_LUMINANCE6_ALPHA2:
-      case GL_LUMINANCE8_ALPHA8:
-      case GL_LUMINANCE12_ALPHA4:
-      case GL_LUMINANCE12_ALPHA12:
-      case GL_LUMINANCE16_ALPHA16:
-      case GL_INTENSITY:
-      case GL_INTENSITY4:
-      case GL_INTENSITY8:
-      case GL_INTENSITY12:
-      case GL_INTENSITY16:
-      case GL_R8:
-      case GL_R16:
-      case GL_RG:
-      case GL_RG8:
-      case GL_RG16:
-      case 3:
-      case GL_RGB:
-      case GL_BGR:
-      case GL_SRGB:
-      case GL_R3_G3_B2:
-      case GL_RGB4:
-      case GL_RGB5:
-      case GL_RGB565:
-      case GL_RGB8:
-      case GL_RGB10:
-      case GL_RGB12:
-      case GL_RGB16:
-      case 4:
-      case GL_ABGR_EXT:
-      case GL_RGBA:
-      case GL_BGRA:
-      case GL_SRGB_ALPHA:
-      case GL_RGBA2:
-      case GL_RGBA4:
-      case GL_RGB5_A1:
-      case GL_RGBA8:
-      case GL_RGB10_A2:
-      case GL_RGBA12:
-      case GL_RGBA16:
-         return GL_TRUE;
-      default:
-         return GL_FALSE;
-   }
-}
-
-/**
- * Test if the given format is a SNORM (signed-normalized) format.
- */
-GLboolean
-_mesa_is_enum_format_snorm(GLenum format)
-{
-   switch (format) {
-   /* signed, normalized texture formats */
-   case GL_RED_SNORM:
-   case GL_R8_SNORM:
-   case GL_R16_SNORM:
-   case GL_RG_SNORM:
-   case GL_RG8_SNORM:
-   case GL_RG16_SNORM:
-   case GL_RGB_SNORM:
-   case GL_RGB8_SNORM:
-   case GL_RGB16_SNORM:
-   case GL_RGBA_SNORM:
-   case GL_RGBA8_SNORM:
-   case GL_RGBA16_SNORM:
-   case GL_ALPHA_SNORM:
-   case GL_ALPHA8_SNORM:
-   case GL_ALPHA16_SNORM:
-   case GL_LUMINANCE_SNORM:
-   case GL_LUMINANCE8_SNORM:
-   case GL_LUMINANCE16_SNORM:
-   case GL_LUMINANCE_ALPHA_SNORM:
-   case GL_LUMINANCE8_ALPHA8_SNORM:
-   case GL_LUMINANCE16_ALPHA16_SNORM:
-   case GL_INTENSITY_SNORM:
-   case GL_INTENSITY8_SNORM:
-   case GL_INTENSITY16_SNORM:
-      return GL_TRUE;
-   default:
-      return GL_FALSE;
-   }
-}
 
 /**
  * Test if the given format is an integer (non-normalized) format.
@@ -1300,60 +1131,76 @@ GLenum
 _mesa_get_nongeneric_internalformat(GLenum format)
 {
    switch (format) {
-   /* GL 1.1 formats. */
-   case 4:
-   case GL_RGBA:
-      return GL_RGBA8;
-   case 3:
-   case GL_RGB:
-      return GL_RGB8;
-   case 2:
-   case GL_LUMINANCE_ALPHA:
-      return GL_LUMINANCE8_ALPHA8;
-   case 1:
-   case GL_LUMINANCE:
-      return GL_LUMINANCE8;
-   case GL_ALPHA:
-      return GL_ALPHA8;
-   case GL_INTENSITY:
-      return GL_INTENSITY8;
+      /* GL 1.1 formats. */
+      case 4:
+      case GL_RGBA:
+         return GL_RGBA8;
 
-   /* GL_ARB_texture_rg */
-   case GL_RED:
-      return GL_R8;
-   case GL_RG:
-      return GL_RG8;
+      case 3:
+      case GL_RGB:
+         return GL_RGB8;
 
-   /* GL_EXT_texture_sRGB */
-   case GL_SRGB:
-      return GL_SRGB8;
-   case GL_SRGB_ALPHA:
-      return GL_SRGB8_ALPHA8;
-   case GL_SLUMINANCE:
-      return GL_SLUMINANCE8;
-   case GL_SLUMINANCE_ALPHA:
-      return GL_SLUMINANCE8_ALPHA8;
+      case 2:
+      case GL_LUMINANCE_ALPHA:
+         return GL_LUMINANCE8_ALPHA8;
 
-   /* GL_EXT_texture_snorm */
-   case GL_RGBA_SNORM:
-      return GL_RGBA8_SNORM;
-   case GL_RGB_SNORM:
-      return GL_RGB8_SNORM;
-   case GL_RG_SNORM:
-      return GL_RG8_SNORM;
-   case GL_RED_SNORM:
-      return GL_R8_SNORM;
-   case GL_LUMINANCE_ALPHA_SNORM:
-      return GL_LUMINANCE8_ALPHA8_SNORM;
-   case GL_LUMINANCE_SNORM:
-      return GL_LUMINANCE8_SNORM;
-   case GL_ALPHA_SNORM:
-      return GL_ALPHA8_SNORM;
-   case GL_INTENSITY_SNORM:
-      return GL_INTENSITY8_SNORM;
+      case 1:
+      case GL_LUMINANCE:
+         return GL_LUMINANCE8;
 
-   default:
-      return format;
+      case GL_ALPHA:
+         return GL_ALPHA8;
+
+      case GL_INTENSITY:
+         return GL_INTENSITY8;
+
+      /* GL_ARB_texture_rg */
+      case GL_RED:
+         return GL_R8;
+
+      case GL_RG:
+         return GL_RG8;
+
+      /* GL_EXT_texture_sRGB */
+      case GL_SRGB:
+         return GL_SRGB8;
+
+      case GL_SRGB_ALPHA:
+         return GL_SRGB8_ALPHA8;
+
+      case GL_SLUMINANCE:
+         return GL_SLUMINANCE8;
+
+      case GL_SLUMINANCE_ALPHA:
+         return GL_SLUMINANCE8_ALPHA8;
+
+      /* GL_EXT_texture_snorm */
+      case GL_RGBA_SNORM:
+         return GL_RGBA8_SNORM;
+
+      case GL_RGB_SNORM:
+         return GL_RGB8_SNORM;
+
+      case GL_RG_SNORM:
+         return GL_RG8_SNORM;
+
+      case GL_RED_SNORM:
+         return GL_R8_SNORM;
+
+      case GL_LUMINANCE_ALPHA_SNORM:
+         return GL_LUMINANCE8_ALPHA8_SNORM;
+
+      case GL_LUMINANCE_SNORM:
+         return GL_LUMINANCE8_SNORM;
+
+      case GL_ALPHA_SNORM:
+         return GL_ALPHA8_SNORM;
+
+      case GL_INTENSITY_SNORM:
+         return GL_INTENSITY8_SNORM;
+
+      default:
+         return format;
    }
 }
 
@@ -1367,20 +1214,22 @@ _mesa_get_linear_internalformat(GLenum format)
    switch (format) {
    case GL_SRGB:
       return GL_RGB;
+
    case GL_SRGB_ALPHA:
       return GL_RGBA;
+
    case GL_SRGB8:
       return GL_RGB8;
+
    case GL_SRGB8_ALPHA8:
       return GL_RGBA8;
-   case GL_SLUMINANCE8:
-      return GL_LUMINANCE8;
+
    case GL_SLUMINANCE:
-      return GL_LUMINANCE;
+      return GL_LUMINANCE8;
+
    case GL_SLUMINANCE_ALPHA:
-      return GL_LUMINANCE_ALPHA;
-   case GL_SLUMINANCE8_ALPHA8:
       return GL_LUMINANCE8_ALPHA8;
+
    default:
       return format;
    }
@@ -1402,22 +1251,6 @@ GLenum
 _mesa_error_check_format_and_type(const struct gl_context *ctx,
                                   GLenum format, GLenum type)
 {
-   /* From OpenGL 3.3 spec, page 220:
-    *    "If the format is DEPTH_STENCIL, then values are taken from
-    *    both the depth buffer and the stencil buffer. If there is no
-    *    depth buffer or if there is no stencil buffer, then the error
-    *    INVALID_OPERATION occurs. If the type parameter is not
-    *    UNSIGNED_INT_24_8 or FLOAT_32_UNSIGNED_INT_24_8_REV, then the
-    *    error INVALID_ENUM occurs."
-    *
-    * OpenGL ES still generates GL_INVALID_OPERATION because glReadPixels
-    * cannot be used to read depth or stencil in that API.
-    */
-   if (_mesa_is_desktop_gl(ctx) && format == GL_DEPTH_STENCIL
-       && type != GL_UNSIGNED_INT_24_8
-       && type != GL_FLOAT_32_UNSIGNED_INT_24_8_REV)
-      return GL_INVALID_ENUM;
-
    /* special type-based checks (see glReadPixels, glDrawPixels error lists) */
    switch (type) {
    case GL_BITMAP:
@@ -1463,6 +1296,9 @@ _mesa_error_check_format_and_type(const struct gl_context *ctx,
       return GL_INVALID_OPERATION;
 
    case GL_UNSIGNED_INT_24_8:
+      if (!ctx->Extensions.EXT_packed_depth_stencil) {
+         return GL_INVALID_ENUM;
+      }
       if (format != GL_DEPTH_STENCIL) {
          return GL_INVALID_OPERATION;
       }
@@ -1503,8 +1339,10 @@ _mesa_error_check_format_and_type(const struct gl_context *ctx,
             case GL_INT:
             case GL_UNSIGNED_INT:
             case GL_FLOAT:
-            case GL_HALF_FLOAT:
                return GL_NO_ERROR;
+            case GL_HALF_FLOAT:
+               return ctx->Extensions.ARB_half_float_pixel
+                  ? GL_NO_ERROR : GL_INVALID_ENUM;
             default:
                return GL_INVALID_ENUM;
          }
@@ -1527,8 +1365,10 @@ _mesa_error_check_format_and_type(const struct gl_context *ctx,
             case GL_INT:
             case GL_UNSIGNED_INT:
             case GL_FLOAT:
-            case GL_HALF_FLOAT:
                return GL_NO_ERROR;
+            case GL_HALF_FLOAT:
+               return ctx->Extensions.ARB_half_float_pixel
+                  ? GL_NO_ERROR : GL_INVALID_ENUM;
             default:
                return GL_INVALID_ENUM;
          }
@@ -1544,8 +1384,10 @@ _mesa_error_check_format_and_type(const struct gl_context *ctx,
             case GL_INT:
             case GL_UNSIGNED_INT:
             case GL_FLOAT:
-            case GL_HALF_FLOAT:
                return GL_NO_ERROR;
+            case GL_HALF_FLOAT:
+               return ctx->Extensions.ARB_half_float_pixel
+                  ? GL_NO_ERROR : GL_INVALID_ENUM;
             default:
                return GL_INVALID_ENUM;
          }
@@ -1563,11 +1405,13 @@ _mesa_error_check_format_and_type(const struct gl_context *ctx,
             case GL_UNSIGNED_BYTE_2_3_3_REV:
             case GL_UNSIGNED_SHORT_5_6_5:
             case GL_UNSIGNED_SHORT_5_6_5_REV:
-            case GL_HALF_FLOAT:
                return GL_NO_ERROR;
             case GL_UNSIGNED_INT_2_10_10_10_REV:
                /* OK by GL_EXT_texture_type_2_10_10_10_REV */
                return (ctx->API == API_OPENGLES2)
+                  ? GL_NO_ERROR : GL_INVALID_ENUM;
+            case GL_HALF_FLOAT:
+               return ctx->Extensions.ARB_half_float_pixel
                   ? GL_NO_ERROR : GL_INVALID_ENUM;
             case GL_UNSIGNED_INT_5_9_9_9_REV:
                return ctx->Extensions.EXT_texture_shared_exponent
@@ -1591,8 +1435,10 @@ _mesa_error_check_format_and_type(const struct gl_context *ctx,
             case GL_INT:
             case GL_UNSIGNED_INT:
             case GL_FLOAT:
-            case GL_HALF_FLOAT:
                return GL_NO_ERROR;
+            case GL_HALF_FLOAT:
+               return ctx->Extensions.ARB_half_float_pixel
+                  ? GL_NO_ERROR : GL_INVALID_ENUM;
             default:
                return GL_INVALID_ENUM;
          }
@@ -1616,8 +1462,10 @@ _mesa_error_check_format_and_type(const struct gl_context *ctx,
             case GL_UNSIGNED_INT_8_8_8_8_REV:
             case GL_UNSIGNED_INT_10_10_10_2:
             case GL_UNSIGNED_INT_2_10_10_10_REV:
-            case GL_HALF_FLOAT:
                return GL_NO_ERROR;
+            case GL_HALF_FLOAT:
+               return ctx->Extensions.ARB_half_float_pixel
+                  ? GL_NO_ERROR : GL_INVALID_ENUM;
             default:
                return GL_INVALID_ENUM;
          }
@@ -1631,8 +1479,9 @@ _mesa_error_check_format_and_type(const struct gl_context *ctx,
          else
             return GL_INVALID_OPERATION;
 
-      case GL_DEPTH_STENCIL:
-         if (type == GL_UNSIGNED_INT_24_8)
+      case GL_DEPTH_STENCIL_EXT:
+         if (ctx->Extensions.EXT_packed_depth_stencil &&
+             type == GL_UNSIGNED_INT_24_8)
             return GL_NO_ERROR;
          else if (ctx->Extensions.ARB_depth_buffer_float &&
              type == GL_FLOAT_32_UNSIGNED_INT_24_8_REV)
@@ -1840,6 +1689,8 @@ GLenum
 _mesa_es3_error_check_format_and_type(GLenum format, GLenum type,
                                       GLenum internalFormat)
 {
+   GLboolean type_valid = GL_TRUE;
+
    switch (format) {
    case GL_RGBA:
       switch (type) {
@@ -2260,5 +2111,5 @@ _mesa_es3_error_check_format_and_type(GLenum format, GLenum type,
       break;
    }
 
-   return GL_NO_ERROR;
+   return type_valid ? GL_NO_ERROR : GL_INVALID_OPERATION;
 }

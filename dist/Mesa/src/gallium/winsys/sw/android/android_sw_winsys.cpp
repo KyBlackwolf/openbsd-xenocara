@@ -74,8 +74,7 @@ namespace android {
 static void
 android_displaytarget_display(struct sw_winsys *ws,
                               struct sw_displaytarget *dt,
-                              void *context_private,
-                              struct pipe_box *box)
+                              void *context_private)
 {
 }
 

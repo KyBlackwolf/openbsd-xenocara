@@ -72,15 +72,15 @@ get_stub(const char *name, const struct mapi_stub *alias)
 void
 mapi_init(const char *spec)
 {
-   static mtx_t mutex = _MTX_INITIALIZER_NP;
+   u_mutex_declare_static(mutex);
    const char *p;
    int ver, count;
 
-   mtx_lock(&mutex);
+   u_mutex_lock(mutex);
 
    /* already initialized */
    if (mapi_num_stubs) {
-      mtx_unlock(&mutex);
+      u_mutex_unlock(mutex);
       return;
    }
 
@@ -90,7 +90,7 @@ mapi_init(const char *spec)
    /* parse version string */
    ver = atoi(p);
    if (ver != 1) {
-      mtx_unlock(&mutex);
+      u_mutex_unlock(mutex);
       return;
    }
    p += strlen(p) + 1;
@@ -115,7 +115,7 @@ mapi_init(const char *spec)
 
    mapi_num_stubs = count;
 
-   mtx_unlock(&mutex);
+   u_mutex_unlock(mutex);
 }
 
 /**
@@ -186,5 +186,5 @@ mapi_table_fill(struct mapi_table *tbl, const mapi_proc *procs)
 void
 mapi_table_make_current(const struct mapi_table *tbl)
 {
-   u_current_set_table(tbl);
+   u_current_set(tbl);
 }

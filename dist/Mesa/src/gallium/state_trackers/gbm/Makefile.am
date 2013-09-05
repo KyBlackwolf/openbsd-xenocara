@@ -20,20 +20,16 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-include Makefile.sources
 include $(top_srcdir)/src/gallium/Automake.inc
 
-AM_CFLAGS = \
-	$(GALLIUM_CFLAGS) \
-	$(VISIBILITY_CFLAGS)
+AM_CFLAGS = $(GALLIUM_CFLAGS)
 AM_CPPFLAGS = \
 	-I$(top_srcdir)/src/gbm/main \
 	-I$(top_srcdir)/include
 if HAVE_EGL_PLATFORM_WAYLAND
-AM_CFLAGS += $(WAYLAND_CFLAGS)
 AM_CPPFLAGS += -DHAVE_WAYLAND_PLATFORM
 endif
 
 noinst_LTLIBRARIES = libgbm.la
 
-libgbm_la_SOURCES = $(C_SOURCES)
+libgbm_la_SOURCES = gbm_drm.c

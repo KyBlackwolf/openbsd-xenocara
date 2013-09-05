@@ -22,9 +22,9 @@
 
 include $(top_srcdir)/src/gallium/Automake.inc
 
-AM_CFLAGS = \
-	$(GALLIUM_WINSYS_CFLAGS) \
-	$(X11_INCLUDES)
+AM_CPPFLAGS = \
+	$(GALLIUM_CFLAGS) \
+	$(X11_CFLAGS)
 
 noinst_LTLIBRARIES = libws_xlib.la
 

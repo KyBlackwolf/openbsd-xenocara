@@ -26,338 +26,238 @@
 
 using namespace clover;
 
-CLOVER_API cl_int
-clGetDeviceIDs(cl_platform_id d_platform, cl_device_type device_type,
-               cl_uint num_entries, cl_device_id *rd_devices,
-               cl_uint *rnum_devices) try {
-   auto &platform = obj(d_platform);
-   std::vector<cl_device_id> d_devs;
+PUBLIC cl_int
+clGetDeviceIDs(cl_platform_id platform, cl_device_type device_type,
+               cl_uint num_entries, cl_device_id *devices,
+               cl_uint *num_devices) {
+   std::vector<cl_device_id> devs;
 
-   if ((!num_entries && rd_devices) ||
-       (!rnum_devices && !rd_devices))
-      throw error(CL_INVALID_VALUE);
+   if ((!num_entries && devices) ||
+       (!num_devices && !devices))
+      return CL_INVALID_VALUE;
 
    // Collect matching devices
-   for (device &dev : platform) {
+   for (device &dev : *platform) {
       if (((device_type & CL_DEVICE_TYPE_DEFAULT) &&
-           dev == platform.front()) ||
+           &dev == &platform->front()) ||
           (device_type & dev.type()))
-         d_devs.push_back(desc(dev));
+         devs.push_back(&dev);
    }
 
-   if (d_devs.empty())
-      throw error(CL_DEVICE_NOT_FOUND);
+   if (devs.empty())
+      return CL_DEVICE_NOT_FOUND;
 
    // ...and return the requested data.
-   if (rnum_devices)
-      *rnum_devices = d_devs.size();
-   if (rd_devices)
-      copy(range(d_devs.begin(),
-                 std::min((unsigned)d_devs.size(), num_entries)),
-           rd_devices);
+   if (num_devices)
+      *num_devices = devs.size();
+   if (devices)
+      std::copy_n(devs.begin(),
+                  std::min((cl_uint)devs.size(), num_entries),
+                  devices);
 
    return CL_SUCCESS;
-
-} catch (error &e) {
-   return e.get();
 }
 
-CLOVER_API cl_int
-clCreateSubDevices(cl_device_id d_dev,
-                   const cl_device_partition_property *props,
-                   cl_uint num_devs, cl_device_id *rd_devs,
-                   cl_uint *rnum_devs) {
-   // There are no currently supported partitioning schemes.
-   return CL_INVALID_VALUE;
-}
-
-CLOVER_API cl_int
-clRetainDevice(cl_device_id d_dev) try {
-   obj(d_dev);
-
-   // The reference count doesn't change for root devices.
-   return CL_SUCCESS;
-
-} catch (error &e) {
-   return e.get();
-}
-
-CLOVER_API cl_int
-clReleaseDevice(cl_device_id d_dev) try {
-   obj(d_dev);
-
-   // The reference count doesn't change for root devices.
-   return CL_SUCCESS;
-
-} catch (error &e) {
-   return e.get();
-}
-
-CLOVER_API cl_int
-clGetDeviceInfo(cl_device_id d_dev, cl_device_info param,
-                size_t size, void *r_buf, size_t *r_size) try {
-   property_buffer buf { r_buf, size, r_size };
-   auto &dev = obj(d_dev);
+PUBLIC cl_int
+clGetDeviceInfo(cl_device_id dev, cl_device_info param,
+                size_t size, void *buf, size_t *size_ret) {
+   if (!dev)
+      return CL_INVALID_DEVICE;
 
    switch (param) {
    case CL_DEVICE_TYPE:
-      buf.as_scalar<cl_device_type>() = dev.type();
-      break;
+      return scalar_property<cl_device_type>(buf, size, size_ret, dev->type());
 
    case CL_DEVICE_VENDOR_ID:
-      buf.as_scalar<cl_uint>() = dev.vendor_id();
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, dev->vendor_id());
 
    case CL_DEVICE_MAX_COMPUTE_UNITS:
-      buf.as_scalar<cl_uint>() = 1;
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 1);
 
    case CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS:
-      buf.as_scalar<cl_uint>() = dev.max_block_size().size();
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret,
+                                      dev->max_block_size().size());
 
    case CL_DEVICE_MAX_WORK_ITEM_SIZES:
-      buf.as_vector<size_t>() = dev.max_block_size();
-      break;
+      return vector_property<size_t>(buf, size, size_ret,
+                                     dev->max_block_size());
 
    case CL_DEVICE_MAX_WORK_GROUP_SIZE:
-      buf.as_scalar<size_t>() = dev.max_threads_per_block();
-      break;
+      return scalar_property<size_t>(buf, size, size_ret,
+                                     dev->max_threads_per_block());
 
    case CL_DEVICE_PREFERRED_VECTOR_WIDTH_CHAR:
-      buf.as_scalar<cl_uint>() = 16;
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 16);
 
    case CL_DEVICE_PREFERRED_VECTOR_WIDTH_SHORT:
-      buf.as_scalar<cl_uint>() = 8;
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 8);
 
    case CL_DEVICE_PREFERRED_VECTOR_WIDTH_INT:
-      buf.as_scalar<cl_uint>() = 4;
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 4);
 
    case CL_DEVICE_PREFERRED_VECTOR_WIDTH_LONG:
-      buf.as_scalar<cl_uint>() = 2;
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 2);
 
    case CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT:
-      buf.as_scalar<cl_uint>() = 4;
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 4);
 
    case CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE:
-      buf.as_scalar<cl_uint>() = 2;
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 2);
 
    case CL_DEVICE_PREFERRED_VECTOR_WIDTH_HALF:
-      buf.as_scalar<cl_uint>() = 0;
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 0);
 
    case CL_DEVICE_MAX_CLOCK_FREQUENCY:
-      buf.as_scalar<cl_uint>() = dev.max_clock_frequency();
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 0);
 
    case CL_DEVICE_ADDRESS_BITS:
-      buf.as_scalar<cl_uint>() = 32;
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 32);
 
    case CL_DEVICE_MAX_READ_IMAGE_ARGS:
-      buf.as_scalar<cl_uint>() = dev.max_images_read();
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret,
+                                      dev->max_images_read());
 
    case CL_DEVICE_MAX_WRITE_IMAGE_ARGS:
-      buf.as_scalar<cl_uint>() = dev.max_images_write();
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret,
+                                      dev->max_images_write());
 
    case CL_DEVICE_MAX_MEM_ALLOC_SIZE:
-      buf.as_scalar<cl_ulong>() = dev.max_mem_alloc_size();
-      break;
+      return scalar_property<cl_ulong>(buf, size, size_ret,
+                                       dev->max_mem_alloc_size());
 
    case CL_DEVICE_IMAGE2D_MAX_WIDTH:
    case CL_DEVICE_IMAGE2D_MAX_HEIGHT:
-      buf.as_scalar<size_t>() = 1 << dev.max_image_levels_2d();
-      break;
+      return scalar_property<size_t>(buf, size, size_ret,
+                                     1 << dev->max_image_levels_2d());
 
    case CL_DEVICE_IMAGE3D_MAX_WIDTH:
    case CL_DEVICE_IMAGE3D_MAX_HEIGHT:
    case CL_DEVICE_IMAGE3D_MAX_DEPTH:
-      buf.as_scalar<size_t>() = 1 << dev.max_image_levels_3d();
-      break;
+      return scalar_property<size_t>(buf, size, size_ret,
+                                     1 << dev->max_image_levels_3d());
 
    case CL_DEVICE_IMAGE_SUPPORT:
-      buf.as_scalar<cl_bool>() = CL_TRUE;
-      break;
+      return scalar_property<cl_bool>(buf, size, size_ret, CL_TRUE);
 
    case CL_DEVICE_MAX_PARAMETER_SIZE:
-      buf.as_scalar<size_t>() = dev.max_mem_input();
-      break;
+      return scalar_property<size_t>(buf, size, size_ret,
+                                     dev->max_mem_input());
 
    case CL_DEVICE_MAX_SAMPLERS:
-      buf.as_scalar<cl_uint>() = dev.max_samplers();
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret,
+                                      dev->max_samplers());
 
    case CL_DEVICE_MEM_BASE_ADDR_ALIGN:
    case CL_DEVICE_MIN_DATA_TYPE_ALIGN_SIZE:
-      buf.as_scalar<cl_uint>() = 128;
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 128);
 
    case CL_DEVICE_SINGLE_FP_CONFIG:
-      buf.as_scalar<cl_device_fp_config>() =
-         CL_FP_DENORM | CL_FP_INF_NAN | CL_FP_ROUND_TO_NEAREST;
-      break;
+      return scalar_property<cl_device_fp_config>(buf, size, size_ret,
+         CL_FP_DENORM | CL_FP_INF_NAN | CL_FP_ROUND_TO_NEAREST);
 
    case CL_DEVICE_GLOBAL_MEM_CACHE_TYPE:
-      buf.as_scalar<cl_device_mem_cache_type>() = CL_NONE;
-      break;
+      return scalar_property<cl_device_mem_cache_type>(buf, size, size_ret,
+                                                       CL_NONE);
 
    case CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE:
-      buf.as_scalar<cl_uint>() = 0;
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 0);
 
    case CL_DEVICE_GLOBAL_MEM_CACHE_SIZE:
-      buf.as_scalar<cl_ulong>() = 0;
-      break;
+      return scalar_property<cl_ulong>(buf, size, size_ret, 0);
 
    case CL_DEVICE_GLOBAL_MEM_SIZE:
-      buf.as_scalar<cl_ulong>() = dev.max_mem_global();
-      break;
+      return scalar_property<cl_ulong>(buf, size, size_ret,
+                                       dev->max_mem_global());
 
    case CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE:
-      buf.as_scalar<cl_ulong>() = dev.max_const_buffer_size();
-      break;
+      return scalar_property<cl_ulong>(buf, size, size_ret,
+                                       dev->max_const_buffer_size());
 
    case CL_DEVICE_MAX_CONSTANT_ARGS:
-      buf.as_scalar<cl_uint>() = dev.max_const_buffers();
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret,
+                                      dev->max_const_buffers());
 
    case CL_DEVICE_LOCAL_MEM_TYPE:
-      buf.as_scalar<cl_device_local_mem_type>() = CL_LOCAL;
-      break;
+      return scalar_property<cl_device_local_mem_type>(buf, size, size_ret,
+                                                       CL_LOCAL);
 
    case CL_DEVICE_LOCAL_MEM_SIZE:
-      buf.as_scalar<cl_ulong>() = dev.max_mem_local();
-      break;
+      return scalar_property<cl_ulong>(buf, size, size_ret,
+                                       dev->max_mem_local());
 
    case CL_DEVICE_ERROR_CORRECTION_SUPPORT:
-      buf.as_scalar<cl_bool>() = CL_FALSE;
-      break;
+      return scalar_property<cl_bool>(buf, size, size_ret, CL_FALSE);
 
    case CL_DEVICE_PROFILING_TIMER_RESOLUTION:
-      buf.as_scalar<size_t>() = 0;
-      break;
+      return scalar_property<size_t>(buf, size, size_ret, 0);
 
    case CL_DEVICE_ENDIAN_LITTLE:
-      buf.as_scalar<cl_bool>() = (dev.endianness() == PIPE_ENDIAN_LITTLE);
-      break;
+      return scalar_property<cl_bool>(buf, size, size_ret,
+                                      dev->endianness() == PIPE_ENDIAN_LITTLE);
 
    case CL_DEVICE_AVAILABLE:
    case CL_DEVICE_COMPILER_AVAILABLE:
-      buf.as_scalar<cl_bool>() = CL_TRUE;
-      break;
+      return scalar_property<cl_bool>(buf, size, size_ret, CL_TRUE);
 
    case CL_DEVICE_EXECUTION_CAPABILITIES:
-      buf.as_scalar<cl_device_exec_capabilities>() = CL_EXEC_KERNEL;
-      break;
+      return scalar_property<cl_device_exec_capabilities>(buf, size, size_ret,
+                                                          CL_EXEC_KERNEL);
 
    case CL_DEVICE_QUEUE_PROPERTIES:
-      buf.as_scalar<cl_command_queue_properties>() = CL_QUEUE_PROFILING_ENABLE;
-      break;
+      return scalar_property<cl_command_queue_properties>(buf, size, size_ret,
+         CL_QUEUE_PROFILING_ENABLE);
 
    case CL_DEVICE_NAME:
-      buf.as_string() = dev.device_name();
-      break;
+      return string_property(buf, size, size_ret, dev->device_name());
 
    case CL_DEVICE_VENDOR:
-      buf.as_string() = dev.vendor_name();
-      break;
+      return string_property(buf, size, size_ret, dev->vendor_name());
 
    case CL_DRIVER_VERSION:
-      buf.as_string() = PACKAGE_VERSION;
-      break;
+      return string_property(buf, size, size_ret, PACKAGE_VERSION);
 
    case CL_DEVICE_PROFILE:
-      buf.as_string() = "FULL_PROFILE";
-      break;
+      return string_property(buf, size, size_ret, "FULL_PROFILE");
 
    case CL_DEVICE_VERSION:
-      buf.as_string() = "OpenCL 1.1 MESA " PACKAGE_VERSION;
-      break;
+      return string_property(buf, size, size_ret,
+                             "OpenCL 1.1 MESA " PACKAGE_VERSION);
 
    case CL_DEVICE_EXTENSIONS:
-      buf.as_string() = "";
-      break;
+      return string_property(buf, size, size_ret, "");
 
    case CL_DEVICE_PLATFORM:
-      buf.as_scalar<cl_platform_id>() = desc(dev.platform);
-      break;
+      return scalar_property<cl_platform_id>(buf, size, size_ret,
+                                             &dev->platform);
 
    case CL_DEVICE_HOST_UNIFIED_MEMORY:
-      buf.as_scalar<cl_bool>() = CL_TRUE;
-      break;
+      return scalar_property<cl_bool>(buf, size, size_ret, CL_TRUE);
 
    case CL_DEVICE_NATIVE_VECTOR_WIDTH_CHAR:
-      buf.as_scalar<cl_uint>() = 16;
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 16);
 
    case CL_DEVICE_NATIVE_VECTOR_WIDTH_SHORT:
-      buf.as_scalar<cl_uint>() = 8;
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 8);
 
    case CL_DEVICE_NATIVE_VECTOR_WIDTH_INT:
-      buf.as_scalar<cl_uint>() = 4;
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 4);
 
    case CL_DEVICE_NATIVE_VECTOR_WIDTH_LONG:
-      buf.as_scalar<cl_uint>() = 2;
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 2);
 
    case CL_DEVICE_NATIVE_VECTOR_WIDTH_FLOAT:
-      buf.as_scalar<cl_uint>() = 4;
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 4);
 
    case CL_DEVICE_NATIVE_VECTOR_WIDTH_DOUBLE:
-      buf.as_scalar<cl_uint>() = 2;
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 2);
 
    case CL_DEVICE_NATIVE_VECTOR_WIDTH_HALF:
-      buf.as_scalar<cl_uint>() = 0;
-      break;
+      return scalar_property<cl_uint>(buf, size, size_ret, 0);
 
    case CL_DEVICE_OPENCL_C_VERSION:
-      buf.as_string() = "OpenCL C 1.1";
-      break;
-
-   case CL_DEVICE_PARENT_DEVICE:
-      buf.as_scalar<cl_device_id>() = NULL;
-      break;
-
-   case CL_DEVICE_PARTITION_MAX_SUB_DEVICES:
-      buf.as_scalar<cl_uint>() = 0;
-      break;
-
-   case CL_DEVICE_PARTITION_PROPERTIES:
-      buf.as_vector<cl_device_partition_property>() =
-         desc(property_list<cl_device_partition_property>());
-      break;
-
-   case CL_DEVICE_PARTITION_AFFINITY_DOMAIN:
-      buf.as_scalar<cl_device_affinity_domain>() = 0;
-      break;
-
-   case CL_DEVICE_PARTITION_TYPE:
-      buf.as_vector<cl_device_partition_property>() =
-         desc(property_list<cl_device_partition_property>());
-      break;
-
-   case CL_DEVICE_REFERENCE_COUNT:
-      buf.as_scalar<cl_uint>() = 1;
-      break;
+      return string_property(buf, size, size_ret, "OpenCL C 1.1");
 
    default:
-      throw error(CL_INVALID_VALUE);
+      return CL_INVALID_VALUE;
    }
-
-   return CL_SUCCESS;
-
-} catch (error &e) {
-   return e.get();
 }

@@ -35,11 +35,16 @@
  * Nothing here.  We could make use of the video codec engine someday.
  */
 
-static struct pipe_video_codec *
+static struct pipe_video_decoder *
 ilo_create_video_decoder(struct pipe_context *pipe,
-                         const struct pipe_video_codec *templ)
+                         enum pipe_video_profile profile,
+                         enum pipe_video_entrypoint entrypoint,
+                         enum pipe_video_chroma_format chroma_format,
+                         unsigned width, unsigned height, unsigned max_references,
+                         bool expect_chunked_decode)
 {
-   return vl_create_decoder(pipe, templ);
+   return vl_create_decoder(pipe, profile, entrypoint, chroma_format,
+         width, height, max_references, expect_chunked_decode);
 }
 
 static struct pipe_video_buffer *
@@ -55,6 +60,6 @@ ilo_create_video_buffer(struct pipe_context *pipe,
 void
 ilo_init_video_functions(struct ilo_context *ilo)
 {
-   ilo->base.create_video_codec = ilo_create_video_decoder;
+   ilo->base.create_video_decoder = ilo_create_video_decoder;
    ilo->base.create_video_buffer = ilo_create_video_buffer;
 }

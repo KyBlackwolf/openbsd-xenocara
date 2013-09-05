@@ -91,9 +91,6 @@ struct toy_tgsi {
    } system_values[8];
    int num_system_values;
 
-   int const_count;
-   bool const_indirect;
-
    bool uses_kill;
 };
 

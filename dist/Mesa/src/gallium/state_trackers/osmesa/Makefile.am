@@ -19,7 +19,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-include Makefile.sources
 include $(top_srcdir)/src/gallium/Automake.inc
 
 AM_CFLAGS = $(GALLIUM_CFLAGS)
@@ -38,4 +37,5 @@ AM_CPPFLAGS = \
 
 noinst_LTLIBRARIES = libosmesa.la
 
-libosmesa_la_SOURCES = $(C_SOURCES)
+libosmesa_la_SOURCES = \
+	osmesa.c

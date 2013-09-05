@@ -39,12 +39,9 @@ LOCAL_CFLAGS := \
 LOCAL_C_INCLUDES := \
 	$(MESA_TOP)/src/mapi \
 	$(MESA_TOP)/src/egl/main \
-	$(MESA_TOP)/src/loader \
-	$(DRM_TOP)/include/drm \
-	$(DRM_GRALLOC_TOP)
-
-LOCAL_STATIC_LIBRARIES := \
-	libloader
+	$(DRM_GRALLOC_TOP) \
+	$(DRM_TOP) \
+	$(DRM_TOP)/include/drm
 
 LOCAL_MODULE := libmesa_egl_dri2
 

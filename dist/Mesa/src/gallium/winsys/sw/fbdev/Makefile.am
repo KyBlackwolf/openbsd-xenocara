@@ -22,8 +22,8 @@
 
 include $(top_srcdir)/src/gallium/Automake.inc
 
-AM_CFLAGS = \
-	$(GALLIUM_WINSYS_CFLAGS)
+AM_CPPFLAGS = \
+	$(GALLIUM_CFLAGS)
 
 noinst_LTLIBRARIES = libfbdev.la
 

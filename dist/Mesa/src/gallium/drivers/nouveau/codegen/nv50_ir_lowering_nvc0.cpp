@@ -26,7 +26,6 @@
 #include "codegen/nv50_ir_target_nvc0.h"
 
 #include <limits>
-#include <tr1/unordered_set>
 
 namespace nv50_ir {
 
@@ -149,8 +148,7 @@ private:
    bool insertTextureBarriers(Function *);
    inline bool insnDominatedBy(const Instruction *, const Instruction *) const;
    void findFirstUses(const Instruction *tex, const Instruction *def,
-                      std::list<TexUse>&,
-                      std::tr1::unordered_set<const Instruction *>&);
+                      std::list<TexUse>&);
    void findOverwritingDefs(const Instruction *tex, Instruction *insn,
                             const BasicBlock *term,
                             std::list<TexUse>&);
@@ -232,28 +230,14 @@ NVC0LegalizePostRA::findOverwritingDefs(const Instruction *texi,
 }
 
 void
-NVC0LegalizePostRA::findFirstUses(
-      const Instruction *texi,
-      const Instruction *insn,
-      std::list<TexUse> &uses,
-      std::tr1::unordered_set<const Instruction *>& visited)
+NVC0LegalizePostRA::findFirstUses(const Instruction *texi,
+                                  const Instruction *insn,
+                                  std::list<TexUse> &uses)
 {
    for (int d = 0; insn->defExists(d); ++d) {
       Value *v = insn->getDef(d);
       for (Value::UseIterator u = v->uses.begin(); u != v->uses.end(); ++u) {
          Instruction *usei = (*u)->getInsn();
-
-         // NOTE: In case of a loop that overwrites a value but never uses
-         // it, it can happen that we have a cycle of uses that consists only
-         // of phis and no-op moves and will thus cause an infinite loop here
-         // since these are not considered actual uses.
-         // The most obvious (and perhaps the only) way to prevent this is to
-         // remember which instructions we've already visited.
-
-         if (visited.find(usei) != visited.end())
-            continue;
-
-         visited.insert(usei);
 
          if (usei->op == OP_PHI || usei->op == OP_UNION) {
             // need a barrier before WAW cases
@@ -269,11 +253,11 @@ NVC0LegalizePostRA::findFirstUses(
              usei->op == OP_PHI ||
              usei->op == OP_UNION) {
             // these uses don't manifest in the machine code
-            findFirstUses(texi, usei, uses, visited);
+            findFirstUses(texi, usei, uses);
          } else
          if (usei->op == OP_MOV && usei->getDef(0)->equals(usei->getSrc(0)) &&
              usei->subOp != NV50_IR_SUBOP_MOV_FINAL) {
-            findFirstUses(texi, usei, uses, visited);
+            findFirstUses(texi, usei, uses);
          } else {
             addTexUse(uses, usei, insn);
          }
@@ -329,10 +313,8 @@ NVC0LegalizePostRA::insertTextureBarriers(Function *fn)
    uses = new std::list<TexUse>[texes.size()];
    if (!uses)
       return false;
-   for (size_t i = 0; i < texes.size(); ++i) {
-      std::tr1::unordered_set<const Instruction *> visited;
-      findFirstUses(texes[i], texes[i], uses[i], visited);
-   }
+   for (size_t i = 0; i < texes.size(); ++i)
+      findFirstUses(texes[i], texes[i], uses[i]);
 
    // determine the barrier level at each use
    for (size_t i = 0; i < texes.size(); ++i) {
@@ -832,7 +814,6 @@ NVC0LoweringPass::handleManualTXD(TexInstruction *i)
    Value *zero = bld.loadImm(bld.getSSA(), 0);
    int l, c;
    const int dim = i->tex.target.getDim();
-   const int array = i->tex.target.isArray();
 
    i->op = OP_TEX; // no need to clone dPdx/dPdy later
 
@@ -843,7 +824,7 @@ NVC0LoweringPass::handleManualTXD(TexInstruction *i)
    for (l = 0; l < 4; ++l) {
       // mov coordinates from lane l to all lanes
       for (c = 0; c < dim; ++c)
-         bld.mkQuadop(0x00, crd[c], l, i->getSrc(c + array), zero);
+         bld.mkQuadop(0x00, crd[c], l, i->getSrc(c), zero);
       // add dPdx from lane l to lanes dx
       for (c = 0; c < dim; ++c)
          bld.mkQuadop(qOps[l][0], crd[c], l, i->dPdx[c].get(), crd[c]);
@@ -853,7 +834,7 @@ NVC0LoweringPass::handleManualTXD(TexInstruction *i)
       // texture
       bld.insert(tex = cloneForward(func, i));
       for (c = 0; c < dim; ++c)
-         tex->setSrc(c + array, crd[c]);
+         tex->setSrc(c, crd[c]);
       // save results
       for (c = 0; i->defExists(c); ++c) {
          Instruction *mov;
@@ -889,8 +870,7 @@ NVC0LoweringPass::handleTXD(TexInstruction *txd)
    if (dim > 2 ||
        txd->tex.target.isCube() ||
        arg > 4 ||
-       txd->tex.target.isShadow() ||
-       txd->tex.useOffsets)
+       txd->tex.target.isShadow())
       return handleManualTXD(txd);
 
    for (int c = 0; c < dim; ++c) {

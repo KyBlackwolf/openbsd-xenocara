@@ -25,7 +25,6 @@
 
 #include <stack>
 #include <limits>
-#include <tr1/unordered_set>
 
 namespace nv50_ir {
 
@@ -1545,11 +1544,6 @@ SpillCodeInserter::run(const std::list<ValuePair>& lst)
       LValue *lval = it->first->asLValue();
       Symbol *mem = it->second ? it->second->asSym() : NULL;
 
-      // Keep track of which instructions to delete later. Deleting them
-      // inside the loop is unsafe since a single instruction may have
-      // multiple destinations that all need to be spilled (like OP_SPLIT).
-      std::tr1::unordered_set<Instruction *> to_del;
-
       for (Value::DefIterator d = lval->defs.begin(); d != lval->defs.end();
            ++d) {
          Value *slot = mem ?
@@ -1582,7 +1576,7 @@ SpillCodeInserter::run(const std::list<ValuePair>& lst)
             d = lval->defs.erase(d);
             --d;
             if (slot->reg.file == FILE_MEMORY_LOCAL)
-               to_del.insert(defi);
+               delete_Instruction(func->getProgram(), defi);
             else
                defi->setDef(0, slot);
          } else {
@@ -1590,9 +1584,6 @@ SpillCodeInserter::run(const std::list<ValuePair>& lst)
          }
       }
 
-      for (std::tr1::unordered_set<Instruction *>::const_iterator it = to_del.begin();
-           it != to_del.end(); ++it)
-         delete_Instruction(func->getProgram(), *it);
    }
 
    // TODO: We're not trying to reuse old slots in a potential next iteration.
@@ -1663,10 +1654,6 @@ RegAlloc::execFunc()
            ret && i <= func->loopNestingBound;
            sequence = func->cfg.nextSequence(), ++i)
          ret = buildLiveSets(BasicBlock::get(func->cfg.getRoot()));
-      // reset marker
-      for (ArrayList::Iterator bi = func->allBBlocks.iterator();
-           !bi.end(); bi.next())
-         BasicBlock::get(bi)->liveSet.marker = false;
       if (!ret)
          break;
       func->orderInstructions(this->insns);

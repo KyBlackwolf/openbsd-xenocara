@@ -484,7 +484,6 @@ public:
          FREE(data);
    }
 
-   // allocate will keep old data iff size is unchanged
    bool allocate(unsigned int nBits, bool zero);
    bool resize(unsigned int nBits); // keep old data, zero additional bits
 
